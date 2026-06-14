@@ -219,6 +219,89 @@ html, body {
 .emoji-item:hover { background: #f0f0f0; transform: scale(1.15); }
 .emoji-item:active { transform: scale(0.95); }
 
+/* ===== THEME PANEL ===== */
+#theme-panel {
+  position: fixed;
+  left: 0; right: 0;
+  background: white;
+  border-top: 3px solid #e9ecef;
+  z-index: 99;
+  display: none;
+  flex-direction: column;
+}
+#theme-panel.open { display: flex; }
+
+@media (pointer: coarse) {
+  #theme-panel { bottom: 0; padding-bottom: 80px; }
+}
+@media (pointer: fine) {
+  #theme-panel { bottom: 0; }
+}
+
+#theme-grid {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 14px;
+  padding: 16px;
+  justify-content: center;
+}
+
+.theme-card {
+  width: 130px;
+  height: 100px;
+  border-radius: 18px;
+  border: 4px solid #dee2e6;
+  cursor: pointer;
+  position: relative;
+  overflow: hidden;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-family: 'Bubblegum Sans', cursive;
+  font-size: 44px;
+  padding: 0;
+  flex-shrink: 0;
+  transition: transform 0.15s, border-color 0.15s;
+  touch-action: manipulation;
+  -webkit-tap-highlight-color: transparent;
+}
+.theme-card:hover { transform: scale(1.06); }
+.theme-card.active { border-color: #4D96FF; transform: scale(1.06); }
+
+/* Name pill at the bottom of each card — readable on any background */
+.theme-card-label {
+  position: absolute;
+  left: 0; right: 0; bottom: 0;
+  font-family: 'Fredoka', sans-serif;
+  font-weight: 600;
+  font-size: 14px;
+  padding: 3px 0 4px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  background: rgba(255,255,255,0.85);
+  color: #444;
+}
+
+/* Per-theme preview backgrounds (mirror the real themes) */
+.theme-card.preview-default    { background: #ffffff; color: #2C3E50; }
+.theme-card.preview-lined {
+  background: #fffef5; color: #2C3E50;
+  background-image: repeating-linear-gradient(transparent, transparent 22px, #c8e0f4 22px, #c8e0f4 24px);
+}
+.theme-card.preview-chalkboard { background: #2d4a22; color: #f0f0f0; }
+.theme-card.preview-sky        { background: linear-gradient(180deg, #87CEEB 0%, #c8e6f5 50%, #E0F7FA 100%); color: #2C3E50; }
+.theme-card.preview-space {
+  background: #0a0a2e; color: #f0f0f0;
+  background-image:
+    radial-gradient(2px 2px at 20px 24px, white, transparent),
+    radial-gradient(1px 1px at 64px 52px, rgba(255,255,255,0.85), transparent),
+    radial-gradient(2px 2px at 102px 28px, white, transparent),
+    radial-gradient(1px 1px at 44px 68px, white, transparent),
+    radial-gradient(2px 2px at 112px 66px, rgba(255,255,255,0.8), transparent);
+}
+
 /* ===== EDITOR ===== */
 #editor {
   width: 100%;
@@ -436,6 +519,11 @@ button.vc-press { transform: scale(0.9) !important; }
   <div id="emoji-grid"></div>
 </div>
 
+<!-- THEME PANEL -->
+<div id="theme-panel">
+  <div id="theme-grid"></div>
+</div>
+
 <!-- EDITOR -->
 <div id="editor" contenteditable="true" spellcheck="false" autocapitalize="off" autocorrect="off" autofocus></div>
 
@@ -469,8 +557,13 @@ let pointerLocked = false;
 
 const rainbowColors = ['#FF6B6B','#FFA94D','#FFD93D','#6BCB77','#4D96FF','#9B59B6','#FF69B4'];
 
-const themes = ['theme-default', 'theme-lined', 'theme-chalkboard', 'theme-sky', 'theme-space'];
-const themeIcons = ['📝', '📓', '🏫', '🌤️', '🚀'];
+const themeData = [
+  { cls: 'theme-default',    preview: 'preview-default',    icon: '📝', name: 'Paper' },
+  { cls: 'theme-lined',      preview: 'preview-lined',      icon: '📓', name: 'Lines' },
+  { cls: 'theme-chalkboard', preview: 'preview-chalkboard', icon: '🏫', name: 'Chalk' },
+  { cls: 'theme-sky',        preview: 'preview-sky',        icon: '🌤️', name: 'Sky'  },
+  { cls: 'theme-space',      preview: 'preview-space',      icon: '🚀', name: 'Space' },
+];
 
 const emojiCategories = {
   '😀 Faces':   ['😀','😂','🥰','😍','🤩','😜','😎','🤗','🥳','😺','👻','🤖','👽','🦄','🌈','😇','🤠','🥹','😻','🫶'],
@@ -486,6 +579,8 @@ const editor = document.getElementById('editor');
 const toolbar = document.getElementById('toolbar');
 const emojiPanel = document.getElementById('emoji-panel');
 const emojiGrid = document.getElementById('emoji-grid');
+const themePanel = document.getElementById('theme-panel');
+const themeGrid = document.getElementById('theme-grid');
 const fullscreenPrompt = document.getElementById('fullscreen-prompt');
 const pageIndicator = document.getElementById('page-indicator');
 
@@ -835,15 +930,50 @@ function closeEmojiPanel() {
 }
 
 document.getElementById('emoji-toggle').addEventListener('click', () => {
+  closeThemePanel();                          // only one panel open at a time
   emojiPanel.classList.toggle('open');
   document.getElementById('emoji-toggle').classList.toggle('active');
 });
 
-// ===== THEME =====
+// ===== THEME PANEL — BOTTOM MENU LIKE THE EMOJI PICKER =====
+// Show every theme as a tappable preview card so the kid can see the options
+// instead of blind-cycling through them.
+function buildThemePanel() {
+  themeGrid.innerHTML = '';
+  themeData.forEach((t, i) => {
+    const card = document.createElement('button');
+    card.className = 'theme-card ' + t.preview + (i === currentThemeIndex ? ' active' : '');
+    card.dataset.index = i;
+    card.innerHTML = 'A<span class="theme-card-label">' + t.icon + ' ' + t.name + '</span>';
+    card.addEventListener('click', () => applyTheme(i));
+    themeGrid.appendChild(card);
+  });
+}
+
+function applyTheme(index) {
+  currentThemeIndex = index;
+  // Swap only the theme class so we don't clobber `locked` (set during pointer
+  // lock in fullscreen, which is exactly when this panel gets used).
+  themeData.forEach(t => document.body.classList.remove(t.cls));
+  document.body.classList.add(themeData[index].cls);
+  themeGrid.querySelectorAll('.theme-card').forEach((c, i) => {
+    c.classList.toggle('active', i === index);
+  });
+  editor.focus();
+}
+
+buildThemePanel();
+
+function closeThemePanel() {
+  themePanel.classList.remove('open');
+  document.getElementById('theme-toggle').classList.remove('active');
+}
+
 document.getElementById('theme-toggle').addEventListener('click', () => {
-  currentThemeIndex = (currentThemeIndex + 1) % themes.length;
-  document.body.className = themes[currentThemeIndex];
-  document.getElementById('theme-toggle').textContent = themeIcons[currentThemeIndex];
+  closeEmojiPanel();                          // only one panel open at a time
+  const open = !themePanel.classList.contains('open');
+  themePanel.classList.toggle('open', open);
+  document.getElementById('theme-toggle').classList.toggle('active', open);
 });
 
 // ===== SOUND =====
@@ -1131,6 +1261,7 @@ document.addEventListener('mousedown', (e) => {
     if (isEditorAt(vc.x, vc.y)) {
       placeCaretAtPoint(vc.x, vc.y);
       closeEmojiPanel();
+      closeThemePanel();
     }
   }
 }, true);
@@ -1209,6 +1340,9 @@ document.getElementById('print-btn').addEventListener('click', () => {
 editor.addEventListener('click', () => {
   if (emojiPanel.classList.contains('open')) {
     closeEmojiPanel();
+  }
+  if (themePanel.classList.contains('open')) {
+    closeThemePanel();
   }
 });
 
