@@ -312,10 +312,16 @@ html, body {
   font-family: 'Bubblegum Sans', cursive;
   color: #2C3E50;
   outline: none;
+  /* Toddlers type whole lines with no spaces. Never scroll sideways — wrap.
+     overflow-x:hidden also stops the pop-animation's scale(1.2) overshoot on the
+     newest letter from flashing a horizontal scrollbar. overflow-wrap:anywhere
+     forces a break mid-run even for an unbroken naked text node (composition
+     input that bypasses our per-letter spans). */
+  overflow-x: hidden;
   overflow-y: auto;
   -webkit-overflow-scrolling: touch;
   word-wrap: break-word;
-  overflow-wrap: break-word;
+  overflow-wrap: anywhere;
   caret-color: #FF6B6B;
   background: var(--editor-bg);
   -webkit-user-select: text;
