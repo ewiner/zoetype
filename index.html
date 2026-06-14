@@ -1,0 +1,972 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+<title>ZoeType</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Bangers&family=Bubblegum+Sans&family=Bungee+Shade&family=Caveat:wght@400;700&family=Fredoka:wght@400;600&family=Patrick+Hand&display=swap" rel="stylesheet">
+<style>
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+:root {
+  --color-bg: #ffffff;
+  --editor-bg: #ffffff;
+}
+
+html, body {
+  height: 100%;
+  overflow: hidden;
+  font-family: 'Fredoka', sans-serif;
+  background: var(--color-bg);
+  touch-action: manipulation;
+  -webkit-user-select: none;
+  user-select: none;
+}
+
+/* ===== TOOLBAR ===== */
+#toolbar {
+  position: fixed;
+  left: 0; right: 0;
+  top: 0;
+  background: #f8f9fa;
+  border-bottom: 3px solid #e9ecef;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 5px;
+  padding: 6px 10px;
+  z-index: 100;
+  overflow: hidden;
+}
+
+@media (pointer: coarse) {
+  #toolbar {
+    top: auto;
+    bottom: 0;
+    border-bottom: none;
+    border-top: 3px solid #e9ecef;
+  }
+}
+
+.toolbar-divider {
+  width: 2px;
+  height: 32px;
+  background: #dee2e6;
+  flex-shrink: 0;
+  border-radius: 1px;
+}
+
+/* ===== COLOR BUTTONS ===== */
+.color-btn {
+  width: 36px; height: 36px;
+  border-radius: 50%;
+  border: 3px solid transparent;
+  cursor: pointer;
+  flex-shrink: 0;
+  transition: transform 0.15s, border-color 0.15s;
+  touch-action: manipulation;
+  -webkit-tap-highlight-color: transparent;
+}
+.color-btn:hover { transform: scale(1.15); }
+.color-btn.active { border-color: #333; transform: scale(1.15); }
+.color-btn[data-color="#FFFFFF"] { border-color: #ccc; }
+.color-btn[data-color="#FFFFFF"].active { border-color: #333; }
+
+/* ===== FONT BUTTONS ===== */
+.font-btn {
+  height: 36px;
+  padding: 0 8px;
+  border-radius: 10px;
+  border: 2px solid #dee2e6;
+  background: white;
+  cursor: pointer;
+  font-size: 15px;
+  flex-shrink: 0;
+  transition: transform 0.15s, border-color 0.15s, background 0.15s;
+  touch-action: manipulation;
+  -webkit-tap-highlight-color: transparent;
+  white-space: nowrap;
+}
+.font-btn:hover { transform: scale(1.08); }
+.font-btn.active { border-color: #4D96FF; background: #EBF3FF; }
+
+/* ===== SIZE BUTTONS ===== */
+.size-btn {
+  width: 36px; height: 36px;
+  border-radius: 10px;
+  border: 2px solid #dee2e6;
+  background: white;
+  cursor: pointer;
+  font-family: 'Fredoka', sans-serif;
+  font-weight: 600;
+  flex-shrink: 0;
+  transition: transform 0.15s, border-color 0.15s, background 0.15s;
+  touch-action: manipulation;
+  -webkit-tap-highlight-color: transparent;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.size-btn:hover { transform: scale(1.08); }
+.size-btn.active { border-color: #4D96FF; background: #EBF3FF; }
+
+/* ===== ICON BUTTONS ===== */
+.icon-btn {
+  width: 40px; height: 40px;
+  border-radius: 12px;
+  border: 2px solid #dee2e6;
+  background: white;
+  cursor: pointer;
+  font-size: 20px;
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: transform 0.15s, border-color 0.15s, background 0.15s;
+  touch-action: manipulation;
+  -webkit-tap-highlight-color: transparent;
+}
+.icon-btn:hover { transform: scale(1.08); }
+.icon-btn.active { border-color: #4D96FF; background: #EBF3FF; }
+
+/* ===== PAGE INDICATOR ===== */
+#page-indicator {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  flex-shrink: 0;
+  font-family: 'Fredoka', sans-serif;
+  font-size: 14px;
+  font-weight: 600;
+  color: #666;
+  padding: 0 2px;
+}
+.page-dot {
+  width: 8px; height: 8px;
+  border-radius: 50%;
+  background: #dee2e6;
+  transition: background 0.2s, transform 0.2s;
+}
+.page-dot.active {
+  background: #4D96FF;
+  transform: scale(1.3);
+}
+
+/* ===== EMOJI PANEL ===== */
+#emoji-panel {
+  position: fixed;
+  left: 0; right: 0;
+  background: white;
+  border-top: 3px solid #e9ecef;
+  z-index: 99;
+  display: none;
+  flex-direction: column;
+}
+#emoji-panel.open { display: flex; }
+
+@media (pointer: coarse) {
+  #emoji-panel { bottom: 0; padding-bottom: 80px; }
+}
+@media (pointer: fine) {
+  #emoji-panel { bottom: 0; }
+}
+
+#emoji-grid {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 8px 12px;
+  overflow: hidden;
+}
+
+.emoji-category-label {
+  font-size: 22px;
+  padding: 6px 4px 2px;
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-family: 'Fredoka', sans-serif;
+  font-weight: 600;
+  color: #888;
+}
+.emoji-category-label span { font-size: 14px; }
+
+.emoji-category-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 2px;
+}
+
+.emoji-item {
+  width: 48px; height: 48px;
+  border: none;
+  background: none;
+  font-size: 32px;
+  cursor: pointer;
+  border-radius: 10px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: transform 0.12s, background 0.12s;
+  touch-action: manipulation;
+  -webkit-tap-highlight-color: transparent;
+  flex-shrink: 0;
+}
+.emoji-item:hover { background: #f0f0f0; transform: scale(1.15); }
+.emoji-item:active { transform: scale(0.95); }
+
+/* ===== EDITOR ===== */
+#editor {
+  width: 100%;
+  height: 100%;
+  padding: 20px 30px;
+  font-size: 72px;
+  line-height: 1.3;
+  font-family: 'Bubblegum Sans', cursive;
+  color: #2C3E50;
+  outline: none;
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+  word-wrap: break-word;
+  overflow-wrap: break-word;
+  caret-color: #FF6B6B;
+  background: var(--editor-bg);
+  -webkit-user-select: text;
+  user-select: text;
+  transition: background 0.4s, color 0.4s;
+}
+
+#editor:empty::before {
+  content: "Hi Zoe! Start typing! 🌈";
+  color: #ccc;
+  pointer-events: none;
+  font-family: 'Bubblegum Sans', cursive;
+}
+
+/* Dynamic padding set by JS based on toolbar height */
+
+/* ===== LETTER ANIMATION ===== */
+@keyframes pop-in {
+  0% { transform: scale(0) rotate(-10deg); opacity: 0; }
+  60% { transform: scale(1.2) rotate(3deg); }
+  100% { transform: scale(1) rotate(0deg); opacity: 1; }
+}
+.letter-pop {
+  display: inline-block;
+  animation: pop-in 0.25s ease-out;
+}
+
+/* ===== THEMES ===== */
+.theme-default { --editor-bg: #ffffff; }
+
+.theme-lined { --editor-bg: #fffef5; }
+.theme-lined #editor {
+  background-image: repeating-linear-gradient(
+    transparent, transparent 88px,
+    #c8e0f4 88px, #c8e0f4 90px
+  );
+  background-position-y: 10px;
+}
+
+.theme-chalkboard { --editor-bg: #2d4a22; }
+.theme-chalkboard #editor { color: #f0f0f0; caret-color: #fff; }
+.theme-chalkboard #editor:empty::before { color: rgba(255,255,255,0.3); }
+
+.theme-sky { --editor-bg: #87CEEB; }
+.theme-sky #editor { background: linear-gradient(180deg, #87CEEB 0%, #c8e6f5 40%, #E0F7FA 100%); }
+
+.theme-space { --editor-bg: #0a0a2e; }
+.theme-space #editor {
+  background: #0a0a2e;
+  color: #f0f0f0;
+  caret-color: #FFD93D;
+  background-image:
+    radial-gradient(2px 2px at 20px 30px, white, transparent),
+    radial-gradient(2px 2px at 40px 70px, rgba(255,255,255,0.8), transparent),
+    radial-gradient(1px 1px at 90px 40px, white, transparent),
+    radial-gradient(2px 2px at 160px 120px, rgba(255,255,255,0.9), transparent),
+    radial-gradient(1px 1px at 200px 60px, white, transparent),
+    radial-gradient(2px 2px at 300px 100px, rgba(255,255,255,0.7), transparent),
+    radial-gradient(1px 1px at 400px 50px, white, transparent),
+    radial-gradient(2px 2px at 500px 150px, white, transparent),
+    radial-gradient(1px 1px at 600px 80px, rgba(255,255,255,0.8), transparent),
+    radial-gradient(2px 2px at 700px 130px, white, transparent);
+  background-size: 800px 200px;
+}
+.theme-space #editor:empty::before { color: rgba(255,255,255,0.3); }
+
+/* ===== FULLSCREEN PROMPT ===== */
+#fullscreen-prompt {
+  position: fixed;
+  inset: 0;
+  background: rgba(0,0,0,0.7);
+  display: none;
+  align-items: center;
+  justify-content: center;
+  z-index: 200;
+}
+#fullscreen-prompt.show { display: flex; }
+
+#fullscreen-prompt button {
+  background: #4D96FF;
+  color: white;
+  border: none;
+  border-radius: 24px;
+  padding: 24px 48px;
+  font-size: 32px;
+  font-family: 'Fredoka', sans-serif;
+  font-weight: 600;
+  cursor: pointer;
+  transition: transform 0.15s;
+  touch-action: manipulation;
+}
+#fullscreen-prompt button:hover { transform: scale(1.08); }
+
+/* ===== PRINT ===== */
+@media print {
+  #toolbar, #emoji-panel, #fullscreen-prompt { display: none !important; }
+  #editor {
+    font-size: 36px !important;
+    padding: 20px !important;
+    min-height: auto !important;
+    height: auto !important;
+    overflow: visible !important;
+  }
+}
+</style>
+</head>
+<body class="theme-default">
+
+<!-- TOOLBAR -->
+<div id="toolbar">
+  <!-- Colors + Rainbow -->
+  <button class="color-btn active" style="background:#FF6B6B" data-color="#FF6B6B" title="Red"></button>
+  <button class="color-btn" style="background:#FFA94D" data-color="#FFA94D" title="Orange"></button>
+  <button class="color-btn" style="background:#FFD93D" data-color="#FFD93D" title="Yellow"></button>
+  <button class="color-btn" style="background:#6BCB77" data-color="#6BCB77" title="Green"></button>
+  <button class="color-btn" style="background:#4D96FF" data-color="#4D96FF" title="Blue"></button>
+  <button class="color-btn" style="background:#9B59B6" data-color="#9B59B6" title="Purple"></button>
+  <button class="color-btn" style="background:#FF69B4" data-color="#FF69B4" title="Pink"></button>
+  <button class="color-btn" style="background:#8B4513" data-color="#8B4513" title="Brown"></button>
+  <button class="color-btn" style="background:#2C3E50" data-color="#2C3E50" title="Black"></button>
+  <button class="color-btn" style="background:#FFFFFF" data-color="#FFFFFF" title="White"></button>
+  <button class="icon-btn" id="rainbow-toggle" title="Rainbow mode" style="width:36px;height:36px;border-radius:50%;font-size:18px">🌈</button>
+
+  <div class="toolbar-divider"></div>
+
+  <!-- Fonts -->
+  <button class="font-btn active" data-font="'Bubblegum Sans', cursive" style="font-family:'Bubblegum Sans',cursive">Bubbly</button>
+  <button class="font-btn" data-font="'Patrick Hand', cursive" style="font-family:'Patrick Hand',cursive">Handy</button>
+  <button class="font-btn" data-font="'Fredoka', sans-serif" style="font-family:'Fredoka',sans-serif">Chunky</button>
+  <button class="font-btn" data-font="'Bangers', cursive" style="font-family:'Bangers',cursive">Comic</button>
+  <button class="font-btn" data-font="'Caveat', cursive" style="font-family:'Caveat',cursive">Scribbly</button>
+  <button class="font-btn" data-font="'Bungee Shade', cursive" style="font-family:'Bungee Shade',cursive">3D</button>
+
+  <div class="toolbar-divider"></div>
+
+  <!-- Sizes -->
+  <button class="size-btn" data-size="48" style="font-size:12px">A</button>
+  <button class="size-btn active" data-size="72" style="font-size:17px">A</button>
+  <button class="size-btn" data-size="96" style="font-size:24px">A</button>
+
+  <div class="toolbar-divider"></div>
+
+  <!-- Emoji -->
+  <button class="icon-btn" id="emoji-toggle" title="Emoji">😀</button>
+
+  <!-- Theme -->
+  <button class="icon-btn" id="theme-toggle" title="Theme">🎨</button>
+
+  <!-- Sound -->
+  <button class="icon-btn" id="sound-toggle" title="Sound">🔊</button>
+
+  <div class="toolbar-divider"></div>
+
+  <!-- Pages -->
+  <button class="icon-btn" id="prev-page" title="Previous page">◀</button>
+  <div id="page-indicator"><span class="page-dot active"></span></div>
+  <button class="icon-btn" id="next-page" title="Next page">▶</button>
+  <button class="icon-btn" id="new-page" title="New page">📄</button>
+
+  <div class="toolbar-divider"></div>
+
+  <!-- Fullscreen -->
+  <button class="icon-btn" id="fullscreen-btn" title="Fullscreen">⛶</button>
+
+  <!-- Print -->
+  <button class="icon-btn" id="print-btn" title="Print">🖨️</button>
+</div>
+
+<!-- EMOJI PANEL -->
+<div id="emoji-panel">
+  <div id="emoji-grid"></div>
+</div>
+
+<!-- EDITOR -->
+<div id="editor" contenteditable="true" spellcheck="false" autocapitalize="off" autocorrect="off" autofocus></div>
+
+<!-- FULLSCREEN PROMPT -->
+<div id="fullscreen-prompt">
+  <button id="reenter-fullscreen">Tap to go full screen! 🌟</button>
+</div>
+
+<script>
+// ===== STATE =====
+let currentColor = '#FF6B6B';
+let currentFont = "'Bubblegum Sans', cursive";
+let currentSize = '72px';
+let soundEnabled = true;
+let currentThemeIndex = 0;
+let pages = [{ content: '' }];
+let currentPage = 0;
+let rainbowMode = false;
+let rainbowIndex = 0;
+let audioCtx = null;
+let hasEnteredFullscreen = false;
+let pointerLocked = false;
+
+const rainbowColors = ['#FF6B6B','#FFA94D','#FFD93D','#6BCB77','#4D96FF','#9B59B6','#FF69B4'];
+
+const themes = ['theme-default', 'theme-lined', 'theme-chalkboard', 'theme-sky', 'theme-space'];
+const themeIcons = ['📝', '📓', '🏫', '🌤️', '🚀'];
+
+const emojiCategories = {
+  '😀 Faces':   ['😀','😂','🥰','😍','🤩','😜','😎','🤗','🥳','😺','👻','🤖','👽','🦄','🌈','😇','🤠','🥹','😻','🫶'],
+  '🐶 Animals': ['🐶','🐱','🐰','🦊','🐻','🐼','🐸','🐵','🦁','🐯','🐮','🐷','🐔','🦋','🐢','🐙','🦕','🐳','🐠','🦩'],
+  '🍎 Food':    ['🍎','🍌','🍕','🍩','🍦','🧁','🍪','🍫','🌮','🍔','🥕','🍇','🍓','🍉','🥤','🍭','🎂','🥞','🍿','🧃'],
+  '🌸 Nature':  ['🌸','🌻','🌲','⭐','🌙','☀️','🌊','❄️','🔥','🍄','🌵','🪻','🌺','🍀','🪴','🌏','💧','🪨','🏔️','🌋'],
+  '⚽ Fun':     ['⚽','🏀','🎨','🎵','🎪','🎭','🎯','🧩','🪁','🎈','🎉','🏆','🚀','✈️','🚗','🚂','🛸','🎸','🥁','🎹'],
+  '❤️ Hearts':  ['❤️','🧡','💛','💚','💙','💜','🖤','🤍','💖','💝','💕','💗','🫶','✨','💫','🌟','⭐','💎','🎀','👑'],
+};
+
+// ===== DOM REFS =====
+const editor = document.getElementById('editor');
+const toolbar = document.getElementById('toolbar');
+const emojiPanel = document.getElementById('emoji-panel');
+const emojiGrid = document.getElementById('emoji-grid');
+const fullscreenPrompt = document.getElementById('fullscreen-prompt');
+const pageIndicator = document.getElementById('page-indicator');
+
+// ===== DYNAMIC TOOLBAR HEIGHT =====
+// Since toolbar wraps, measure its actual height and set editor padding accordingly.
+function updateEditorPadding() {
+  const h = toolbar.offsetHeight;
+  const isCoarse = window.matchMedia('(pointer: coarse)').matches;
+  if (isCoarse) {
+    editor.style.paddingTop = '20px';
+    editor.style.paddingBottom = (h + 20) + 'px';
+  } else {
+    editor.style.paddingTop = (h + 20) + 'px';
+    editor.style.paddingBottom = '20px';
+  }
+}
+// Run on load + resize
+updateEditorPadding();
+window.addEventListener('resize', updateEditorPadding);
+new ResizeObserver(updateEditorPadding).observe(toolbar);
+
+// ===== LOAD SAVED DATA =====
+(function loadSaved() {
+  try {
+    const saved = localStorage.getItem('zoetype-pages');
+    if (saved) {
+      pages = JSON.parse(saved);
+      if (pages.length > 0) {
+        editor.innerHTML = pages[0].content;
+      }
+    }
+  } catch (e) { /* ignore corrupt data */ }
+})();
+
+// ===== HELPER: INSERT STYLED CHAR AT CURSOR =====
+function insertStyledChar(char) {
+  const span = document.createElement('span');
+  span.textContent = char;
+  if (rainbowMode) {
+    span.style.color = rainbowColors[rainbowIndex % rainbowColors.length];
+    rainbowIndex++;
+  } else {
+    span.style.color = currentColor;
+  }
+  span.style.fontFamily = currentFont;
+  span.style.fontSize = currentSize;
+  span.classList.add('letter-pop');
+  return span;
+}
+
+// ===== KEY REPEAT SUPPRESSION =====
+editor.addEventListener('keydown', (e) => {
+  // Block key repeat
+  if (e.repeat) {
+    e.preventDefault();
+    return;
+  }
+
+  // Block dangerous shortcuts (but allow Cmd+Z undo, Cmd+Shift+Z redo, Cmd+A select all)
+  if (e.metaKey || e.ctrlKey) {
+    const allowed = ['z', 'a'];
+    if (!allowed.includes(e.key.toLowerCase())) {
+      e.preventDefault();
+      return;
+    }
+  }
+
+  // Block function keys
+  if (e.key.startsWith('F') && e.key.length > 1 && !isNaN(e.key.slice(1))) {
+    e.preventDefault();
+    return;
+  }
+
+  // Handle Enter — always insert a <br> at the current cursor position
+  if (e.key === 'Enter') {
+    e.preventDefault();
+    const sel = window.getSelection();
+    if (!sel.rangeCount) return;
+    const range = sel.getRangeAt(0);
+    range.deleteContents();
+
+    const br = document.createElement('br');
+    range.insertNode(br);
+
+    // We need a trailing <br> after our <br> if we're at the end,
+    // otherwise the browser won't visually show the new line.
+    // But always move cursor AFTER our inserted <br>.
+    const needsTrailing = !br.nextSibling ||
+      (br.nextSibling.nodeType === 1 && br.nextSibling.tagName === 'BR' && !br.nextSibling.nextSibling);
+    if (needsTrailing) {
+      const extra = document.createElement('br');
+      br.parentNode.insertBefore(extra, br.nextSibling);
+    }
+
+    // Move cursor after the br
+    const newRange = document.createRange();
+    newRange.setStartAfter(br);
+    newRange.collapse(true);
+    sel.removeAllRanges();
+    sel.addRange(newRange);
+
+    playKeySound('Enter');
+    scheduleSave();
+    return;
+  }
+
+  // Play sound for printable keys
+  if (e.key.length === 1) {
+    playKeySound(e.key);
+  }
+  // Sound for backspace/delete
+  if (e.key === 'Backspace' || e.key === 'Delete') {
+    playKeySound('_delete');
+  }
+});
+
+// ===== TEXT INPUT — WRAP CHARS IN STYLED SPANS =====
+editor.addEventListener('beforeinput', (e) => {
+  // Handle both regular text and space (insertText covers both)
+  if (e.inputType === 'insertText' && e.data) {
+    e.preventDefault();
+    const sel = window.getSelection();
+    if (!sel.rangeCount) return;
+    const range = sel.getRangeAt(0);
+    range.deleteContents();
+
+    for (const char of e.data) {
+      const span = insertStyledChar(char);
+      range.insertNode(span);
+      range.setStartAfter(span);
+      range.collapse(true);
+    }
+
+    sel.removeAllRanges();
+    sel.addRange(range);
+    scheduleSave();
+  }
+});
+
+// ===== SPACEBAR FIX =====
+// Some browsers treat space in contenteditable specially and don't fire
+// beforeinput with insertText. Catch it explicitly.
+editor.addEventListener('keydown', (e) => {
+  if (e.key === ' ' && !e.repeat && !e.metaKey && !e.ctrlKey) {
+    // We let it through in keydown, but if beforeinput doesn't fire for space,
+    // we handle it in the keypress/input fallback below.
+  }
+});
+
+// Additional fallback: if a space was inserted as raw text (not via our spans),
+// observe mutations and wrap naked text nodes.
+const observer = new MutationObserver((mutations) => {
+  for (const mut of mutations) {
+    if (mut.type === 'childList') {
+      for (const node of mut.addedNodes) {
+        if (node.nodeType === 3 && node.textContent.trim() === '' && node.textContent.includes(' ')) {
+          // Naked space text node — wrap it in a styled span
+          const span = insertStyledChar(node.textContent);
+          node.parentNode.replaceChild(span, node);
+          // Move cursor after the span
+          const sel = window.getSelection();
+          const range = document.createRange();
+          range.setStartAfter(span);
+          range.collapse(true);
+          sel.removeAllRanges();
+          sel.addRange(range);
+        }
+      }
+    }
+  }
+});
+observer.observe(editor, { childList: true, subtree: true });
+
+// ===== PASTE — STRIP FORMATTING =====
+editor.addEventListener('paste', (e) => {
+  e.preventDefault();
+  const text = (e.clipboardData || window.clipboardData).getData('text/plain');
+  if (!text) return;
+  const sel = window.getSelection();
+  if (!sel.rangeCount) return;
+  const range = sel.getRangeAt(0);
+  range.deleteContents();
+
+  for (const char of text) {
+    if (char === '\n') {
+      const br = document.createElement('br');
+      range.insertNode(br);
+      range.setStartAfter(br);
+    } else {
+      const span = insertStyledChar(char);
+      range.insertNode(span);
+      range.setStartAfter(span);
+    }
+    range.collapse(true);
+  }
+  sel.removeAllRanges();
+  sel.addRange(range);
+  scheduleSave();
+});
+
+// ===== SAVE / INPUT CHANGE TRACKING =====
+editor.addEventListener('input', scheduleSave);
+
+let saveTimer = null;
+function scheduleSave() {
+  clearTimeout(saveTimer);
+  saveTimer = setTimeout(savePages, 400);
+}
+
+function savePages() {
+  pages[currentPage].content = editor.innerHTML;
+  try {
+    localStorage.setItem('zoetype-pages', JSON.stringify(pages));
+  } catch (e) { /* storage full, ignore */ }
+}
+
+// ===== COLOR PICKER =====
+document.querySelectorAll('.color-btn').forEach(btn => {
+  btn.addEventListener('click', (e) => {
+    e.preventDefault();
+    document.querySelectorAll('.color-btn').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+    currentColor = btn.dataset.color;
+    // Turn off rainbow mode when picking a specific color
+    rainbowMode = false;
+    document.getElementById('rainbow-toggle').classList.remove('active');
+    editor.focus();
+  });
+});
+
+// ===== FONT PICKER =====
+document.querySelectorAll('.font-btn').forEach(btn => {
+  btn.addEventListener('click', (e) => {
+    e.preventDefault();
+    document.querySelectorAll('.font-btn').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+    currentFont = btn.dataset.font;
+    editor.focus();
+  });
+});
+
+// ===== SIZE PICKER =====
+document.querySelectorAll('.size-btn').forEach(btn => {
+  btn.addEventListener('click', (e) => {
+    e.preventDefault();
+    document.querySelectorAll('.size-btn').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+    currentSize = btn.dataset.size + 'px';
+    editor.focus();
+  });
+});
+
+// ===== EMOJI PANEL — SINGLE LEVEL, ALL CATEGORIES, NO SCROLL =====
+function buildEmojiPanel() {
+  emojiGrid.innerHTML = '';
+
+  const categoryCount = Object.keys(emojiCategories).length; // 6
+  const panelWidth = window.innerWidth - 24; // padding
+  const emojiW = 50; // item width + gap
+  const emojisPerRow = Math.floor(panelWidth / emojiW);
+
+  // Calculate available height for the emoji panel.
+  // We want it to fit without scrolling. Leave room for toolbar + some editor.
+  const toolbarH = toolbar.offsetHeight;
+  const availableH = window.innerHeight - toolbarH - 40; // 40px breathing room
+  // Each category takes: ~30px header + (rows * 50px per row)
+  // Budget per category:
+  const perCategoryBudget = Math.floor(availableH / categoryCount);
+  const headerH = 34; // header height
+  const rowH = 50; // emoji row height
+  const rowsPerCategory = Math.max(1, Math.floor((perCategoryBudget - headerH) / rowH));
+  const maxEmoji = rowsPerCategory * emojisPerRow;
+
+  for (const [label, emojis] of Object.entries(emojiCategories)) {
+    const header = document.createElement('div');
+    header.className = 'emoji-category-label';
+    header.textContent = label;
+    emojiGrid.appendChild(header);
+
+    const row = document.createElement('div');
+    row.className = 'emoji-category-row';
+    const showEmojis = emojis.slice(0, maxEmoji);
+    for (const em of showEmojis) {
+      const btn = document.createElement('button');
+      btn.className = 'emoji-item';
+      btn.textContent = em;
+      btn.addEventListener('click', () => insertEmoji(em));
+      row.appendChild(btn);
+    }
+    emojiGrid.appendChild(row);
+  }
+}
+
+function insertEmoji(emoji) {
+  editor.focus();
+  const sel = window.getSelection();
+  if (!sel.rangeCount) {
+    const range = document.createRange();
+    range.selectNodeContents(editor);
+    range.collapse(false);
+    sel.removeAllRanges();
+    sel.addRange(range);
+  }
+  const range = sel.getRangeAt(0);
+  range.deleteContents();
+  const span = document.createElement('span');
+  span.textContent = emoji;
+  span.style.fontSize = currentSize;
+  span.classList.add('letter-pop');
+  range.insertNode(span);
+  range.setStartAfter(span);
+  range.collapse(true);
+  sel.removeAllRanges();
+  sel.addRange(range);
+  playKeySound(emoji);
+  scheduleSave();
+}
+
+buildEmojiPanel();
+// Rebuild on resize to adjust emoji count
+let resizeEmojiTimer = null;
+window.addEventListener('resize', () => {
+  clearTimeout(resizeEmojiTimer);
+  resizeEmojiTimer = setTimeout(buildEmojiPanel, 300);
+});
+
+document.getElementById('emoji-toggle').addEventListener('click', () => {
+  emojiPanel.classList.toggle('open');
+  document.getElementById('emoji-toggle').classList.toggle('active');
+});
+
+// ===== THEME =====
+document.getElementById('theme-toggle').addEventListener('click', () => {
+  currentThemeIndex = (currentThemeIndex + 1) % themes.length;
+  document.body.className = themes[currentThemeIndex];
+  document.getElementById('theme-toggle').textContent = themeIcons[currentThemeIndex];
+});
+
+// ===== SOUND =====
+function initAudio() {
+  if (!audioCtx) {
+    audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+  }
+  if (audioCtx.state === 'suspended') {
+    audioCtx.resume();
+  }
+}
+
+function playKeySound(key) {
+  if (!soundEnabled) return;
+  initAudio();
+
+  const osc = audioCtx.createOscillator();
+  const gain = audioCtx.createGain();
+
+  if (key === '_delete') {
+    osc.frequency.value = 220;
+    osc.type = 'sine';
+    gain.gain.setValueAtTime(0.15, audioCtx.currentTime);
+    gain.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + 0.15);
+    osc.connect(gain);
+    gain.connect(audioCtx.destination);
+    osc.start();
+    osc.stop(audioCtx.currentTime + 0.15);
+    return;
+  }
+
+  const pentatonic = [0, 2, 4, 7, 9];
+  let offset = 0;
+  if (key.length === 1) {
+    offset = key.toLowerCase().charCodeAt(0) % 15;
+  } else {
+    offset = Math.floor(Math.random() * 10);
+  }
+  const baseFreq = 523.25;
+  const semitones = pentatonic[offset % 5] + Math.floor(offset / 5) * 12;
+  const freq = baseFreq * Math.pow(2, semitones / 12);
+
+  osc.frequency.value = freq;
+  osc.type = 'triangle';
+  gain.gain.setValueAtTime(0.2, audioCtx.currentTime);
+  gain.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + 0.25);
+
+  osc.connect(gain);
+  gain.connect(audioCtx.destination);
+  osc.start();
+  osc.stop(audioCtx.currentTime + 0.25);
+}
+
+document.getElementById('sound-toggle').addEventListener('click', () => {
+  soundEnabled = !soundEnabled;
+  document.getElementById('sound-toggle').textContent = soundEnabled ? '🔊' : '🔇';
+});
+
+// ===== RAINBOW MODE =====
+document.getElementById('rainbow-toggle').addEventListener('click', () => {
+  rainbowMode = !rainbowMode;
+  document.getElementById('rainbow-toggle').classList.toggle('active', rainbowMode);
+  if (rainbowMode) {
+    document.querySelectorAll('.color-btn').forEach(b => b.classList.remove('active'));
+  } else {
+    document.querySelector(`.color-btn[data-color="${currentColor}"]`)?.classList.add('active');
+  }
+  editor.focus();
+});
+
+// ===== PAGE MANAGEMENT =====
+function updatePageIndicator() {
+  pageIndicator.innerHTML = '';
+  pages.forEach((_, i) => {
+    const dot = document.createElement('span');
+    dot.className = 'page-dot' + (i === currentPage ? ' active' : '');
+    pageIndicator.appendChild(dot);
+  });
+}
+
+function switchPage(index) {
+  if (index < 0 || index >= pages.length) return;
+  pages[currentPage].content = editor.innerHTML;
+  currentPage = index;
+  editor.innerHTML = pages[currentPage].content;
+  updatePageIndicator();
+  savePages();
+}
+
+document.getElementById('new-page').addEventListener('click', () => {
+  pages[currentPage].content = editor.innerHTML;
+  pages.push({ content: '' });
+  currentPage = pages.length - 1;
+  editor.innerHTML = '';
+  updatePageIndicator();
+  editor.focus();
+  savePages();
+});
+
+document.getElementById('prev-page').addEventListener('click', () => {
+  switchPage(currentPage - 1);
+  editor.focus();
+});
+
+document.getElementById('next-page').addEventListener('click', () => {
+  switchPage(currentPage + 1);
+  editor.focus();
+});
+
+updatePageIndicator();
+
+// ===== FULLSCREEN + POINTER LOCK =====
+async function enterLockedFullscreen() {
+  const el = document.documentElement;
+  try {
+    // Pointer lock must be requested BEFORE fullscreen (fullscreen consumes transient activation)
+    await el.requestPointerLock();
+    pointerLocked = true;
+  } catch (e) {
+    // Pointer lock may fail — that's okay, still go fullscreen
+  }
+  try {
+    await el.requestFullscreen();
+    hasEnteredFullscreen = true;
+  } catch (e) {}
+}
+
+document.getElementById('fullscreen-btn').addEventListener('click', () => {
+  if (!document.fullscreenElement) {
+    enterLockedFullscreen();
+  } else {
+    document.exitFullscreen().catch(() => {});
+  }
+});
+
+document.getElementById('reenter-fullscreen').addEventListener('click', () => {
+  enterLockedFullscreen();
+  fullscreenPrompt.classList.remove('show');
+});
+
+document.addEventListener('fullscreenchange', () => {
+  if (!document.fullscreenElement && hasEnteredFullscreen) {
+    // Exited fullscreen — also exit pointer lock if active
+    if (document.pointerLockElement) {
+      document.exitPointerLock();
+    }
+    pointerLocked = false;
+    fullscreenPrompt.classList.add('show');
+  } else {
+    fullscreenPrompt.classList.remove('show');
+  }
+});
+
+document.addEventListener('pointerlockchange', () => {
+  pointerLocked = !!document.pointerLockElement;
+});
+
+// ===== PREVENT ACCIDENTAL EXIT =====
+window.addEventListener('beforeunload', (e) => {
+  if (editor.innerHTML.trim()) {
+    e.preventDefault();
+  }
+});
+
+// ===== PREVENT CONTEXT MENU =====
+document.addEventListener('contextmenu', (e) => {
+  e.preventDefault();
+});
+
+// ===== FOCUS EDITOR ON LOAD =====
+editor.focus();
+
+// ===== PRINT =====
+document.getElementById('print-btn').addEventListener('click', () => {
+  window.print();
+});
+
+// ===== CLICK OUTSIDE EMOJI PANEL TO CLOSE =====
+editor.addEventListener('click', () => {
+  if (emojiPanel.classList.contains('open')) {
+    emojiPanel.classList.remove('open');
+    document.getElementById('emoji-toggle').classList.remove('active');
+  }
+});
+</script>
+</body>
+</html>
