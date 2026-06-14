@@ -305,13 +305,15 @@ html, body {
   inset: 0;
   background: rgba(0,0,0,0.7);
   display: none;
+  flex-direction: column;
   align-items: center;
   justify-content: center;
+  gap: 28px;
   z-index: 200;
 }
 #fullscreen-prompt.show { display: flex; }
 
-#fullscreen-prompt button {
+#reenter-fullscreen {
   background: #4D96FF;
   color: white;
   border: none;
@@ -324,7 +326,24 @@ html, body {
   transition: transform 0.15s;
   touch-action: manipulation;
 }
-#fullscreen-prompt button:hover { transform: scale(1.08); }
+#reenter-fullscreen:hover { transform: scale(1.08); }
+
+/* Deliberately small, muted escape hatch so you don't get trapped re-entering.
+   The toddler is on the keyboard only — just the touchpad-using parent aims here. */
+#confirm-exit-fullscreen {
+  background: none;
+  border: none;
+  color: rgba(255,255,255,0.5);
+  font-family: 'Fredoka', sans-serif;
+  font-size: 15px;
+  padding: 6px 12px;
+  cursor: pointer;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+  touch-action: manipulation;
+  transition: color 0.15s;
+}
+#confirm-exit-fullscreen:hover { color: rgba(255,255,255,0.9); }
 
 /* ===== VIRTUAL CURSOR ===== */
 /* When pointer-locked we hide the real cursor everywhere and draw our own. */
@@ -442,6 +461,7 @@ button.vc-press { transform: scale(0.9) !important; }
 <!-- FULLSCREEN PROMPT -->
 <div id="fullscreen-prompt">
   <button id="reenter-fullscreen">Tap to go full screen! 🌟</button>
+  <button id="confirm-exit-fullscreen">Exit fullscreen</button>
 </div>
 
 <!-- VIRTUAL CURSOR (shown only while pointer is locked) -->
@@ -1061,6 +1081,13 @@ document.getElementById('fullscreen-btn').addEventListener('click', () => {
 
 document.getElementById('reenter-fullscreen').addEventListener('click', () => {
   enterLockedFullscreen();
+});
+
+// Deliberate opt-out: stop nagging and stay in the normal windowed view. The
+// ⛶ toolbar button re-enters locked fullscreen whenever you want it back.
+document.getElementById('confirm-exit-fullscreen').addEventListener('click', () => {
+  hasEnteredFullscreen = false;
+  updatePrompt();
 });
 
 document.addEventListener('fullscreenchange', () => {
