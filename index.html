@@ -698,16 +698,39 @@ function insertLineBreak() {
   const range = sel.getRangeAt(0);
   range.deleteContents();
 
+  // The caret may sit *inside* a character span's text node — this happens
+  // whenever it was repositioned via the virtual cursor, since
+  // caretRangeFromPoint returns an offset within the span's text node (offset 0
+  // = before the letter, offset 1 = after). Inserting the <br> there nests it
+  // inside the inline-block span (<span>H<br></span>), which doesn't break the
+  // line normally and makes the text appear to split mid-character. Hoist the
+  // insertion point out to a boundary between the editor's direct children so
+  // the <br> always lands *between* character spans, never inside one.
+  if (range.startContainer !== editor) {
+    const c = range.startContainer;
+    const atEnd = c.nodeType === Node.TEXT_NODE
+      ? range.startOffset >= c.length
+      : range.startOffset >= c.childNodes.length;
+    // Climb to the node that is a direct child of the editor.
+    let node = c;
+    while (node.parentNode && node.parentNode !== editor) node = node.parentNode;
+    if (node.parentNode === editor) {
+      if (atEnd) range.setStartAfter(node);
+      else range.setStartBefore(node);
+      range.collapse(true);
+    }
+  }
+
   const br = document.createElement('br');
   range.insertNode(br);
 
-  // A trailing <br> is needed for the new line to render when we're at the end
-  // of the content (a single trailing <br> otherwise collapses visually).
-  const needsTrailing = !br.nextSibling ||
-    (br.nextSibling.nodeType === 1 && br.nextSibling.tagName === 'BR' && !br.nextSibling.nextSibling);
-  if (needsTrailing) {
-    const extra = document.createElement('br');
-    br.parentNode.insertBefore(extra, br.nextSibling);
+  // When the break is inserted at the very end of the content, a single trailing
+  // <br> is needed so the new (empty) line actually renders — a lone trailing
+  // <br> otherwise collapses visually. Only add it when nothing follows the
+  // break; if a trailing pad already exists (e.g. from a previous Enter), reuse
+  // it rather than stacking up extra blank lines.
+  if (!br.nextSibling) {
+    br.parentNode.appendChild(document.createElement('br'));
   }
 
   const newRange = document.createRange();
