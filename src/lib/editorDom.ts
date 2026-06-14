@@ -1,0 +1,273 @@
+import type { CharStyle } from '../types'
+
+/**
+ * Dependencies the editor event handlers need. Passed in (rather than read from
+ * module globals) so every handler is a plain, unit-testable function.
+ */
+export interface EditorDeps {
+  editor: HTMLElement
+  /** Returns the style for the next character. Advances rainbow state when on. */
+  resolveStyle: () => CharStyle
+  /** Called after any mutation so the caller can schedule a save. */
+  onChange: () => void
+  /** Plays the key/feedback sound for a given key. */
+  playSound: (key: string) => void
+}
+
+/**
+ * Build a styled span for a single character.
+ *
+ * Each char span is `display:inline-block` (for the pop animation); a lone space
+ * inside an inline-block collapses to zero width, so we preserve whitespace with
+ * `white-space:pre`. Line wrapping still works because every letter is its own
+ * inline-block box.
+ */
+export function makeCharSpan(char: string, style: CharStyle): HTMLSpanElement {
+  const span = document.createElement('span')
+  span.textContent = char
+  span.style.color = style.color
+  span.style.fontFamily = style.fontFamily
+  span.style.fontSize = style.fontSize
+  span.style.whiteSpace = 'pre'
+  span.classList.add('letter-pop')
+  return span
+}
+
+/**
+ * Insert a `<br>` at the caret.
+ *
+ * We do this manually (rather than via execCommand('insertLineBreak'), which
+ * nests the break inside the current character span) so the DOM stays flat: our
+ * typing handler always leaves the caret positioned after each character span at
+ * the top level.
+ */
+export function insertLineBreak(editor: HTMLElement): void {
+  const sel = window.getSelection()
+  if (!sel || !sel.rangeCount) return
+  const range = sel.getRangeAt(0)
+  range.deleteContents()
+
+  // The caret may sit *inside* a character span's text node — this happens
+  // whenever it was repositioned via the virtual cursor, since
+  // caretRangeFromPoint returns an offset within the span's text node (offset 0
+  // = before the letter, offset 1 = after). Inserting the <br> there nests it
+  // inside the inline-block span (<span>H<br></span>), which doesn't break the
+  // line normally and makes the text appear to split mid-character. Hoist the
+  // insertion point out to a boundary between the editor's direct children so
+  // the <br> always lands *between* character spans, never inside one.
+  if (range.startContainer !== editor) {
+    const c = range.startContainer
+    const atEnd =
+      c.nodeType === Node.TEXT_NODE
+        ? range.startOffset >= (c as Text).length
+        : range.startOffset >= c.childNodes.length
+    // Climb to the node that is a direct child of the editor.
+    let node: Node = c
+    while (node.parentNode && node.parentNode !== editor) node = node.parentNode
+    if (node.parentNode === editor) {
+      if (atEnd) range.setStartAfter(node)
+      else range.setStartBefore(node)
+      range.collapse(true)
+    }
+  }
+
+  const br = document.createElement('br')
+  range.insertNode(br)
+
+  // When the break is inserted at the very end of the content, a single trailing
+  // <br> is needed so the new (empty) line actually renders — a lone trailing
+  // <br> otherwise collapses visually. Only add it when nothing follows the
+  // break; if a trailing pad already exists (e.g. from a previous Enter), reuse
+  // it rather than stacking up extra blank lines.
+  if (!br.nextSibling) {
+    br.parentNode!.appendChild(document.createElement('br'))
+  }
+
+  const newRange = document.createRange()
+  newRange.setStartAfter(br)
+  newRange.collapse(true)
+  sel.removeAllRanges()
+  sel.addRange(newRange)
+}
+
+/** Wrap each typed character in its own styled span (insertText path). */
+export function handleBeforeInput(e: InputEvent, deps: EditorDeps): void {
+  if (e.inputType !== 'insertText' || !e.data) return
+  e.preventDefault()
+  const sel = window.getSelection()
+  if (!sel || !sel.rangeCount) return
+  const range = sel.getRangeAt(0)
+  range.deleteContents()
+
+  for (const char of e.data) {
+    const span = makeCharSpan(char, deps.resolveStyle())
+    range.insertNode(span)
+    range.setStartAfter(span)
+    range.collapse(true)
+  }
+
+  sel.removeAllRanges()
+  sel.addRange(range)
+  deps.onChange()
+}
+
+/**
+ * Keydown guard + special-key handling.
+ *
+ * - Blocks key repeat (a toddler leaning on a key shouldn't machine-gun input).
+ * - Blocks dangerous Cmd/Ctrl shortcuts. Only Cmd/Ctrl+A (select all) is allowed;
+ *   Cmd+Z is intentionally NOT allowed — the custom span-based input bypasses the
+ *   browser's native undo stack, so undo was a misleading no-op. Dropped outright.
+ * - Blocks function keys and Tab (Tab would strand focus on a toolbar button).
+ * - Enter inserts a flat line break.
+ * - Plays sounds for printable keys and delete.
+ */
+export function handleKeydown(e: KeyboardEvent, deps: EditorDeps): void {
+  if (e.repeat) {
+    e.preventDefault()
+    return
+  }
+
+  if (e.metaKey || e.ctrlKey) {
+    const allowed = ['a']
+    if (!allowed.includes(e.key.toLowerCase())) {
+      e.preventDefault()
+      return
+    }
+  }
+
+  // Block function keys (F1–F12)
+  if (e.key.startsWith('F') && e.key.length > 1 && !isNaN(Number(e.key.slice(1)))) {
+    e.preventDefault()
+    return
+  }
+
+  if (e.key === 'Tab') {
+    e.preventDefault()
+    return
+  }
+
+  if (e.key === 'Enter') {
+    e.preventDefault()
+    insertLineBreak(deps.editor)
+    deps.playSound('Enter')
+    deps.onChange()
+    return
+  }
+
+  if (e.key.length === 1) {
+    deps.playSound(e.key)
+  }
+  if (e.key === 'Backspace' || e.key === 'Delete') {
+    deps.playSound('_delete')
+  }
+}
+
+/** Strip formatting on paste; newlines become `<br>`, every other char a styled span. */
+export function handlePaste(e: ClipboardEvent, deps: EditorDeps): void {
+  e.preventDefault()
+  const text = e.clipboardData?.getData('text/plain')
+  if (!text) return
+  const sel = window.getSelection()
+  if (!sel || !sel.rangeCount) return
+  const range = sel.getRangeAt(0)
+  range.deleteContents()
+
+  for (const char of text) {
+    if (char === '\n') {
+      const br = document.createElement('br')
+      range.insertNode(br)
+      range.setStartAfter(br)
+    } else {
+      const span = makeCharSpan(char, deps.resolveStyle())
+      range.insertNode(span)
+      range.setStartAfter(span)
+    }
+    range.collapse(true)
+  }
+  sel.removeAllRanges()
+  sel.addRange(range)
+  deps.onChange()
+}
+
+/**
+ * Fallback for browsers that insert a naked whitespace text node instead of
+ * routing through our beforeinput handler. Replace it with one styled span per
+ * character (preserving the one-span-per-char invariant the rest of the app
+ * relies on) and move the caret after the last span.
+ */
+export function wrapNakedSpaceNode(node: Text, deps: EditorDeps): void {
+  const parent = node.parentNode
+  if (!parent) return
+  const frag = document.createDocumentFragment()
+  let last: HTMLSpanElement | null = null
+  for (const char of node.textContent ?? '') {
+    last = makeCharSpan(char, deps.resolveStyle())
+    frag.appendChild(last)
+  }
+  parent.replaceChild(frag, node)
+  if (last) {
+    const sel = window.getSelection()
+    if (sel) {
+      const range = document.createRange()
+      range.setStartAfter(last)
+      range.collapse(true)
+      sel.removeAllRanges()
+      sel.addRange(range)
+    }
+  }
+}
+
+/**
+ * Insert an emoji span at the caret, creating a caret at the end if there is none.
+ * Emoji are styled like typed characters (so they pick up the current colour /
+ * rainbow and size) — note most emoji render as colour glyphs and ignore `color`.
+ */
+export function insertEmoji(editor: HTMLElement, emoji: string, style: CharStyle): void {
+  editor.focus()
+  const sel = window.getSelection()
+  if (!sel) return
+  if (!sel.rangeCount) {
+    const r = document.createRange()
+    r.selectNodeContents(editor)
+    r.collapse(false)
+    sel.removeAllRanges()
+    sel.addRange(r)
+  }
+  const range = sel.getRangeAt(0)
+  range.deleteContents()
+  const span = makeCharSpan(emoji, style)
+  range.insertNode(span)
+  range.setStartAfter(span)
+  range.collapse(true)
+  sel.removeAllRanges()
+  sel.addRange(range)
+}
+
+/** Place the caret at a viewport point (used by the virtual cursor under pointer lock). */
+export function placeCaretAtPoint(editor: HTMLElement, x: number, y: number): void {
+  let range: Range | null = null
+  // caretRangeFromPoint is the WebKit/Blink API; caretPositionFromPoint the standard one.
+  const doc = document as Document & {
+    caretRangeFromPoint?: (x: number, y: number) => Range | null
+    caretPositionFromPoint?: (x: number, y: number) => CaretPosition | null
+  }
+  if (doc.caretRangeFromPoint) {
+    range = doc.caretRangeFromPoint(x, y)
+  } else if (doc.caretPositionFromPoint) {
+    const p = doc.caretPositionFromPoint(x, y)
+    if (p) {
+      range = document.createRange()
+      range.setStart(p.offsetNode, p.offset)
+      range.collapse(true)
+    }
+  }
+  editor.focus()
+  if (range) {
+    const sel = window.getSelection()
+    if (sel) {
+      sel.removeAllRanges()
+      sel.addRange(range)
+    }
+  }
+}
