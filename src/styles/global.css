@@ -1,0 +1,623 @@
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+:root {
+  --color-bg: #ffffff;
+  --editor-bg: #ffffff;
+}
+
+html,
+body {
+  height: 100%;
+  overflow: hidden;
+  overscroll-behavior: none;
+  font-family: 'Fredoka', sans-serif;
+  background: var(--color-bg);
+  touch-action: manipulation;
+  -webkit-user-select: none;
+  user-select: none;
+}
+
+#root {
+  height: 100%;
+}
+
+/* ===== TOOLBAR ===== */
+#toolbar {
+  position: fixed;
+  left: 0;
+  right: 0;
+  top: 0;
+  background: #f8f9fa;
+  border-bottom: 3px solid #e9ecef;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 5px;
+  padding: 6px 10px;
+  z-index: 100;
+  overflow: hidden;
+}
+
+@media (pointer: coarse) {
+  #toolbar {
+    top: auto;
+    bottom: 0;
+    border-bottom: none;
+    border-top: 3px solid #e9ecef;
+  }
+}
+
+.toolbar-divider {
+  width: 2px;
+  height: 32px;
+  background: #dee2e6;
+  flex-shrink: 0;
+  border-radius: 1px;
+}
+
+/* ===== COLOR BUTTONS ===== */
+.color-btn {
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  border: 3px solid transparent;
+  cursor: pointer;
+  flex-shrink: 0;
+  transition: transform 0.15s, border-color 0.15s;
+  touch-action: manipulation;
+  -webkit-tap-highlight-color: transparent;
+}
+.color-btn:hover {
+  transform: scale(1.15);
+}
+.color-btn.active {
+  border-color: #333;
+  transform: scale(1.15);
+}
+.color-btn[data-color='#FFFFFF'] {
+  border-color: #ccc;
+}
+.color-btn[data-color='#FFFFFF'].active {
+  border-color: #333;
+}
+
+/* ===== FONT BUTTONS ===== */
+.font-btn {
+  height: 36px;
+  padding: 0 8px;
+  border-radius: 10px;
+  border: 2px solid #dee2e6;
+  background: white;
+  cursor: pointer;
+  font-size: 15px;
+  flex-shrink: 0;
+  transition: transform 0.15s, border-color 0.15s, background 0.15s;
+  touch-action: manipulation;
+  -webkit-tap-highlight-color: transparent;
+  white-space: nowrap;
+}
+.font-btn:hover {
+  transform: scale(1.08);
+}
+.font-btn.active {
+  border-color: #4d96ff;
+  background: #ebf3ff;
+}
+
+/* ===== SIZE BUTTONS ===== */
+.size-btn {
+  width: 36px;
+  height: 36px;
+  border-radius: 10px;
+  border: 2px solid #dee2e6;
+  background: white;
+  cursor: pointer;
+  font-family: 'Fredoka', sans-serif;
+  font-weight: 600;
+  flex-shrink: 0;
+  transition: transform 0.15s, border-color 0.15s, background 0.15s;
+  touch-action: manipulation;
+  -webkit-tap-highlight-color: transparent;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.size-btn:hover {
+  transform: scale(1.08);
+}
+.size-btn.active {
+  border-color: #4d96ff;
+  background: #ebf3ff;
+}
+
+/* ===== ICON BUTTONS ===== */
+.icon-btn {
+  width: 40px;
+  height: 40px;
+  border-radius: 12px;
+  border: 2px solid #dee2e6;
+  background: white;
+  cursor: pointer;
+  font-size: 20px;
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: transform 0.15s, border-color 0.15s, background 0.15s;
+  touch-action: manipulation;
+  -webkit-tap-highlight-color: transparent;
+}
+.icon-btn:hover {
+  transform: scale(1.08);
+}
+.icon-btn.active {
+  border-color: #4d96ff;
+  background: #ebf3ff;
+}
+
+/* The rainbow toggle is a round icon button. */
+.icon-btn.rainbow-btn {
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  font-size: 18px;
+}
+
+/* ===== PAGE INDICATOR ===== */
+#page-indicator {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  flex-shrink: 0;
+  font-family: 'Fredoka', sans-serif;
+  font-size: 14px;
+  font-weight: 600;
+  color: #666;
+  padding: 0 2px;
+}
+.page-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: #dee2e6;
+  transition: background 0.2s, transform 0.2s;
+}
+.page-dot.active {
+  background: #4d96ff;
+  transform: scale(1.3);
+}
+
+/* ===== EMOJI PANEL ===== */
+#emoji-panel {
+  position: fixed;
+  left: 0;
+  right: 0;
+  background: white;
+  border-top: 3px solid #e9ecef;
+  z-index: 99;
+  display: none;
+  flex-direction: column;
+}
+#emoji-panel.open {
+  display: flex;
+}
+
+@media (pointer: coarse) {
+  #emoji-panel {
+    bottom: 0;
+    padding-bottom: 80px;
+  }
+}
+@media (pointer: fine) {
+  #emoji-panel {
+    bottom: 0;
+  }
+}
+
+#emoji-grid {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 8px 12px;
+  overflow: hidden;
+}
+
+.emoji-category-label {
+  font-size: 22px;
+  padding: 6px 4px 2px;
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-family: 'Fredoka', sans-serif;
+  font-weight: 600;
+  color: #888;
+}
+.emoji-category-label span {
+  font-size: 14px;
+}
+
+.emoji-category-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 2px;
+}
+
+.emoji-item {
+  width: 48px;
+  height: 48px;
+  border: none;
+  background: none;
+  font-size: 32px;
+  cursor: pointer;
+  border-radius: 10px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: transform 0.12s, background 0.12s;
+  touch-action: manipulation;
+  -webkit-tap-highlight-color: transparent;
+  flex-shrink: 0;
+}
+.emoji-item:hover {
+  background: #f0f0f0;
+  transform: scale(1.15);
+}
+.emoji-item:active {
+  transform: scale(0.95);
+}
+
+/* ===== THEME PANEL ===== */
+#theme-panel {
+  position: fixed;
+  left: 0;
+  right: 0;
+  background: white;
+  border-top: 3px solid #e9ecef;
+  z-index: 99;
+  display: none;
+  flex-direction: column;
+}
+#theme-panel.open {
+  display: flex;
+}
+
+@media (pointer: coarse) {
+  #theme-panel {
+    bottom: 0;
+    padding-bottom: 80px;
+  }
+}
+@media (pointer: fine) {
+  #theme-panel {
+    bottom: 0;
+  }
+}
+
+#theme-grid {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 14px;
+  padding: 16px;
+  justify-content: center;
+}
+
+.theme-card {
+  width: 130px;
+  height: 100px;
+  border-radius: 18px;
+  border: 4px solid #dee2e6;
+  cursor: pointer;
+  position: relative;
+  overflow: hidden;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-family: 'Bubblegum Sans', cursive;
+  font-size: 44px;
+  padding: 0;
+  flex-shrink: 0;
+  transition: transform 0.15s, border-color 0.15s;
+  touch-action: manipulation;
+  -webkit-tap-highlight-color: transparent;
+}
+.theme-card:hover {
+  transform: scale(1.06);
+}
+.theme-card.active {
+  border-color: #4d96ff;
+  transform: scale(1.06);
+}
+
+/* Name pill at the bottom of each card — readable on any background */
+.theme-card-label {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  font-family: 'Fredoka', sans-serif;
+  font-weight: 600;
+  font-size: 14px;
+  padding: 3px 0 4px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  background: rgba(255, 255, 255, 0.85);
+  color: #444;
+}
+
+/* Per-theme preview backgrounds (mirror the real themes) */
+.theme-card.preview-default {
+  background: #ffffff;
+  color: #2c3e50;
+}
+.theme-card.preview-lined {
+  background: #fffef5;
+  color: #2c3e50;
+  background-image: repeating-linear-gradient(
+    transparent,
+    transparent 22px,
+    #c8e0f4 22px,
+    #c8e0f4 24px
+  );
+}
+.theme-card.preview-chalkboard {
+  background: #2d4a22;
+  color: #f0f0f0;
+}
+.theme-card.preview-sky {
+  background: linear-gradient(180deg, #87ceeb 0%, #c8e6f5 50%, #e0f7fa 100%);
+  color: #2c3e50;
+}
+.theme-card.preview-space {
+  background: #0a0a2e;
+  color: #f0f0f0;
+  background-image: radial-gradient(2px 2px at 20px 24px, white, transparent),
+    radial-gradient(1px 1px at 64px 52px, rgba(255, 255, 255, 0.85), transparent),
+    radial-gradient(2px 2px at 102px 28px, white, transparent),
+    radial-gradient(1px 1px at 44px 68px, white, transparent),
+    radial-gradient(2px 2px at 112px 66px, rgba(255, 255, 255, 0.8), transparent);
+}
+
+/* ===== EDITOR ===== */
+#editor {
+  width: 100%;
+  height: 100%;
+  padding: 20px 30px;
+  font-size: 72px;
+  line-height: 1.3;
+  font-family: 'Bubblegum Sans', cursive;
+  color: #2c3e50;
+  outline: none;
+  /* Toddlers type whole lines with no spaces. Never scroll sideways — wrap.
+     overflow-x:hidden also stops the pop-animation's scale(1.2) overshoot on the
+     newest letter from flashing a horizontal scrollbar. overflow-wrap:anywhere
+     forces a break mid-run even for an unbroken naked text node (composition
+     input that bypasses our per-letter spans). */
+  overflow-x: hidden;
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+  word-wrap: break-word;
+  overflow-wrap: anywhere;
+  caret-color: #ff6b6b;
+  background: var(--editor-bg);
+  -webkit-user-select: text;
+  user-select: text;
+  transition: background 0.4s, color 0.4s;
+}
+
+#editor:empty::before {
+  content: 'Hi Zoe! Start typing! 🌈';
+  color: #ccc;
+  pointer-events: none;
+  font-family: 'Bubblegum Sans', cursive;
+}
+
+/* Padding top/bottom is set dynamically by JS based on toolbar height. */
+
+/* ===== LETTER ANIMATION ===== */
+@keyframes pop-in {
+  0% {
+    transform: scale(0) rotate(-10deg);
+    opacity: 0;
+  }
+  60% {
+    transform: scale(1.2) rotate(3deg);
+  }
+  100% {
+    transform: scale(1) rotate(0deg);
+    opacity: 1;
+  }
+}
+.letter-pop {
+  display: inline-block;
+  animation: pop-in 0.25s ease-out;
+}
+
+/* ===== THEMES ===== */
+.theme-default {
+  --editor-bg: #ffffff;
+}
+
+.theme-lined {
+  --editor-bg: #fffef5;
+}
+.theme-lined #editor {
+  background-image: repeating-linear-gradient(
+    transparent,
+    transparent 88px,
+    #c8e0f4 88px,
+    #c8e0f4 90px
+  );
+  background-position-y: 10px;
+}
+
+.theme-chalkboard {
+  --editor-bg: #2d4a22;
+}
+.theme-chalkboard #editor {
+  color: #f0f0f0;
+  caret-color: #fff;
+}
+.theme-chalkboard #editor:empty::before {
+  color: rgba(255, 255, 255, 0.3);
+}
+
+.theme-sky {
+  --editor-bg: #87ceeb;
+}
+.theme-sky #editor {
+  background: linear-gradient(180deg, #87ceeb 0%, #c8e6f5 40%, #e0f7fa 100%);
+}
+
+.theme-space {
+  --editor-bg: #0a0a2e;
+}
+.theme-space #editor {
+  background: #0a0a2e;
+  color: #f0f0f0;
+  caret-color: #ffd93d;
+  background-image: radial-gradient(2px 2px at 20px 30px, white, transparent),
+    radial-gradient(2px 2px at 40px 70px, rgba(255, 255, 255, 0.8), transparent),
+    radial-gradient(1px 1px at 90px 40px, white, transparent),
+    radial-gradient(2px 2px at 160px 120px, rgba(255, 255, 255, 0.9), transparent),
+    radial-gradient(1px 1px at 200px 60px, white, transparent),
+    radial-gradient(2px 2px at 300px 100px, rgba(255, 255, 255, 0.7), transparent),
+    radial-gradient(1px 1px at 400px 50px, white, transparent),
+    radial-gradient(2px 2px at 500px 150px, white, transparent),
+    radial-gradient(1px 1px at 600px 80px, rgba(255, 255, 255, 0.8), transparent),
+    radial-gradient(2px 2px at 700px 130px, white, transparent);
+  background-size: 800px 200px;
+}
+.theme-space #editor:empty::before {
+  color: rgba(255, 255, 255, 0.3);
+}
+
+/* ===== FULLSCREEN PROMPT ===== */
+#fullscreen-prompt {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.7);
+  display: none;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 28px;
+  z-index: 200;
+}
+#fullscreen-prompt.show {
+  display: flex;
+}
+
+#reenter-fullscreen {
+  background: #4d96ff;
+  color: white;
+  border: none;
+  border-radius: 24px;
+  padding: 24px 48px;
+  font-size: 32px;
+  font-family: 'Fredoka', sans-serif;
+  font-weight: 600;
+  cursor: pointer;
+  transition: transform 0.15s;
+  touch-action: manipulation;
+}
+#reenter-fullscreen:hover {
+  transform: scale(1.08);
+}
+
+/* Deliberately small, muted escape hatch so you don't get trapped re-entering.
+   The toddler is on the keyboard only — just the touchpad-using parent aims here. */
+#confirm-exit-fullscreen {
+  background: none;
+  border: none;
+  color: rgba(255, 255, 255, 0.5);
+  font-family: 'Fredoka', sans-serif;
+  font-size: 15px;
+  padding: 6px 12px;
+  cursor: pointer;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+  touch-action: manipulation;
+  transition: color 0.15s;
+}
+#confirm-exit-fullscreen:hover {
+  color: rgba(255, 255, 255, 0.9);
+}
+
+/* ===== VIRTUAL CURSOR ===== */
+/* When pointer-locked we hide the real cursor everywhere and draw our own. */
+body.locked,
+body.locked * {
+  cursor: none !important;
+}
+
+#virtual-cursor {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 30px;
+  height: 30px;
+  pointer-events: none; /* never caught by elementFromPoint / clicks */
+  z-index: 9999;
+  display: none;
+  will-change: transform;
+  transform: translate3d(-100px, -100px, 0);
+  transition: none;
+}
+#virtual-cursor svg {
+  width: 100%;
+  height: 100%;
+  display: block;
+  filter: drop-shadow(0 2px 3px rgba(0, 0, 0, 0.35));
+}
+#virtual-cursor.pressing {
+  transform-origin: 4px 4px;
+}
+#virtual-cursor.pressing svg {
+  transform: scale(0.8);
+  transition: transform 0.06s ease-out;
+}
+
+/* Hover feedback for the virtual cursor (real :hover can't fire under pointer lock) */
+.vc-hover {
+  filter: brightness(1.06);
+}
+button.vc-hover {
+  transform: scale(1.12);
+}
+.color-btn.vc-hover {
+  transform: scale(1.15);
+}
+.emoji-item.vc-hover {
+  background: #f0f0f0;
+  transform: scale(1.15);
+}
+button.vc-press {
+  transform: scale(0.9) !important;
+}
+
+/* ===== PRINT ===== */
+@media print {
+  #toolbar,
+  #emoji-panel,
+  #theme-panel,
+  #fullscreen-prompt,
+  #virtual-cursor {
+    display: none !important;
+  }
+  #editor {
+    font-size: 36px !important;
+    padding: 20px !important;
+    min-height: auto !important;
+    height: auto !important;
+    overflow: visible !important;
+  }
+}

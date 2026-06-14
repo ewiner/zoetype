@@ -1,0 +1,36 @@
+{
+  "name": "zoetype",
+  "private": true,
+  "version": "1.0.0",
+  "type": "module",
+  "description": "A toddler-proof word processor.",
+  "scripts": {
+    "dev": "vite",
+    "build": "tsc -b && vite build",
+    "preview": "vite preview",
+    "test": "vitest run",
+    "test:watch": "vitest"
+  },
+  "dependencies": {
+    "@fontsource/bangers": "^5.1.0",
+    "@fontsource/bubblegum-sans": "^5.1.0",
+    "@fontsource/bungee-shade": "^5.1.0",
+    "@fontsource/caveat": "^5.1.0",
+    "@fontsource/fredoka": "^5.1.0",
+    "@fontsource/patrick-hand": "^5.1.0",
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1"
+  },
+  "devDependencies": {
+    "@testing-library/jest-dom": "^6.6.3",
+    "@testing-library/react": "^16.1.0",
+    "@testing-library/user-event": "^14.5.2",
+    "@types/react": "^18.3.18",
+    "@types/react-dom": "^18.3.5",
+    "@vitejs/plugin-react": "^4.3.4",
+    "happy-dom": "^15.11.7",
+    "typescript": "^5.7.2",
+    "vite": "^5.4.11",
+    "vitest": "^2.1.8"
+  }
+}

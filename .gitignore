@@ -1,0 +1,21 @@
+node_modules
+dist
+dist-ssr
+*.local
+*.tsbuildinfo
+.vercel
+
+# Editor / OS
+.DS_Store
+*.log
+logs
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+.idea
+.vscode/*
+!.vscode/extensions.json
+
+# Claude Code local state (keep launch.json, ignore personal settings)
+.claude/settings.local.json
+.claude/worktrees
