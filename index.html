@@ -421,6 +421,7 @@ button.vc-press { transform: scale(0.9) !important; }
   <div id="page-indicator"><span class="page-dot active"></span></div>
   <button class="icon-btn" id="next-page" title="Next page">▶</button>
   <button class="icon-btn" id="new-page" title="New page">📄</button>
+  <button class="icon-btn" id="delete-page" title="Delete page">🗑️</button>
 
   <div class="toolbar-divider"></div>
 
@@ -507,17 +508,48 @@ updateEditorPadding();
 window.addEventListener('resize', updateEditorPadding);
 new ResizeObserver(updateEditorPadding).observe(toolbar);
 
+// ===== SESSION TIMEOUT =====
+// If it's been more than 30 minutes since the app was last used, open on a
+// fresh blank page instead of dropping the child back into whatever was on
+// screen last time. Previous pages are kept and still reachable via ◀ / ▶.
+const SESSION_TIMEOUT_MS = 30 * 60 * 1000;
+
+function isBlankContent(html) {
+  if (!html) return true;
+  const tmp = document.createElement('div');
+  tmp.innerHTML = html;
+  return !tmp.textContent.trim();
+}
+
+function markActive() {
+  try { localStorage.setItem('zoetype-last-active', String(Date.now())); }
+  catch (e) { /* storage full, ignore */ }
+}
+
 // ===== LOAD SAVED DATA =====
 (function loadSaved() {
   try {
     const saved = localStorage.getItem('zoetype-pages');
     if (saved) {
-      pages = JSON.parse(saved);
-      if (pages.length > 0) {
-        editor.innerHTML = pages[0].content;
-      }
+      const parsed = JSON.parse(saved);
+      if (Array.isArray(parsed) && parsed.length > 0) pages = parsed;
     }
   } catch (e) { /* ignore corrupt data */ }
+
+  const lastActive = parseInt(localStorage.getItem('zoetype-last-active'), 10);
+  const stale = isNaN(lastActive) || (Date.now() - lastActive > SESSION_TIMEOUT_MS);
+
+  if (stale) {
+    // Start fresh — but reuse a trailing blank page if one's already there, so
+    // empties don't pile up across sessions.
+    if (!isBlankContent(pages[pages.length - 1].content)) pages.push({ content: '' });
+    currentPage = pages.length - 1;
+  } else {
+    currentPage = 0;
+  }
+
+  editor.innerHTML = pages[currentPage].content;
+  markActive();
 })();
 
 // ===== HELPER: INSERT STYLED CHAR AT CURSOR =====
@@ -717,6 +749,7 @@ function savePages() {
   try {
     localStorage.setItem('zoetype-pages', JSON.stringify(pages));
   } catch (e) { /* storage full, ignore */ }
+  markActive();
 }
 
 // ===== COLOR PICKER =====
@@ -951,6 +984,23 @@ document.getElementById('prev-page').addEventListener('click', () => {
 document.getElementById('next-page').addEventListener('click', () => {
   switchPage(currentPage + 1);
   editor.focus();
+});
+
+// Delete the current page outright — no confirm (a dialog would be its own
+// footgun on a toddler toy). Deleting the last remaining page leaves a single
+// blank one so we always land somewhere typable.
+document.getElementById('delete-page').addEventListener('click', () => {
+  pages.splice(currentPage, 1);
+  if (pages.length === 0) {
+    pages = [{ content: '' }];
+    currentPage = 0;
+  } else if (currentPage > pages.length - 1) {
+    currentPage = pages.length - 1;
+  }
+  editor.innerHTML = pages[currentPage].content;
+  updatePageIndicator();
+  editor.focus();
+  savePages();
 });
 
 updatePageIndicator();
