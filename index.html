@@ -18,6 +18,7 @@
 html, body {
   height: 100%;
   overflow: hidden;
+  overscroll-behavior: none;
   font-family: 'Fredoka', sans-serif;
   background: var(--color-bg);
   touch-action: manipulation;
@@ -325,9 +326,39 @@ html, body {
 }
 #fullscreen-prompt button:hover { transform: scale(1.08); }
 
+/* ===== VIRTUAL CURSOR ===== */
+/* When pointer-locked we hide the real cursor everywhere and draw our own. */
+body.locked, body.locked * { cursor: none !important; }
+
+#virtual-cursor {
+  position: fixed;
+  top: 0; left: 0;
+  width: 30px; height: 30px;
+  pointer-events: none;       /* never caught by elementFromPoint / clicks */
+  z-index: 9999;
+  display: none;
+  will-change: transform;
+  transform: translate3d(-100px, -100px, 0);
+  transition: none;
+}
+#virtual-cursor svg {
+  width: 100%; height: 100%;
+  display: block;
+  filter: drop-shadow(0 2px 3px rgba(0,0,0,0.35));
+}
+#virtual-cursor.pressing { transform-origin: 4px 4px; }
+#virtual-cursor.pressing svg { transform: scale(0.8); transition: transform 0.06s ease-out; }
+
+/* Hover feedback for the virtual cursor (real :hover can't fire under pointer lock) */
+.vc-hover { filter: brightness(1.06); }
+button.vc-hover { transform: scale(1.12); }
+.color-btn.vc-hover { transform: scale(1.15); }
+.emoji-item.vc-hover { background: #f0f0f0; transform: scale(1.15); }
+button.vc-press { transform: scale(0.9) !important; }
+
 /* ===== PRINT ===== */
 @media print {
-  #toolbar, #emoji-panel, #fullscreen-prompt { display: none !important; }
+  #toolbar, #emoji-panel, #fullscreen-prompt, #virtual-cursor { display: none !important; }
   #editor {
     font-size: 36px !important;
     padding: 20px !important;
@@ -413,6 +444,14 @@ html, body {
   <button id="reenter-fullscreen">Tap to go full screen! 🌟</button>
 </div>
 
+<!-- VIRTUAL CURSOR (shown only while pointer is locked) -->
+<div id="virtual-cursor" aria-hidden="true">
+  <svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+    <path d="M3 2 L3 20.5 L8 15.5 L11.2 22.5 L14 21.2 L10.9 14.4 L18 14.2 Z"
+          fill="#ffffff" stroke="#1b1b1b" stroke-width="1.6" stroke-linejoin="round"/>
+  </svg>
+</div>
+
 <script>
 // ===== STATE =====
 let currentColor = '#FF6B6B';
@@ -493,8 +532,42 @@ function insertStyledChar(char) {
   }
   span.style.fontFamily = currentFont;
   span.style.fontSize = currentSize;
+  // Each char span is display:inline-block (for the pop animation); a lone space
+  // inside an inline-block collapses to zero width, so preserve whitespace here.
+  // Line wrapping still works because every letter is its own inline-block box.
+  span.style.whiteSpace = 'pre';
   span.classList.add('letter-pop');
   return span;
+}
+
+// ===== LINE BREAK =====
+// Insert a <br> at the caret. We do this manually (rather than via
+// execCommand('insertLineBreak'), which nests the break inside the current
+// character span) so the DOM stays flat: our typing handler always leaves the
+// caret positioned *after* each character span at the top level.
+function insertLineBreak() {
+  const sel = window.getSelection();
+  if (!sel.rangeCount) return;
+  const range = sel.getRangeAt(0);
+  range.deleteContents();
+
+  const br = document.createElement('br');
+  range.insertNode(br);
+
+  // A trailing <br> is needed for the new line to render when we're at the end
+  // of the content (a single trailing <br> otherwise collapses visually).
+  const needsTrailing = !br.nextSibling ||
+    (br.nextSibling.nodeType === 1 && br.nextSibling.tagName === 'BR' && !br.nextSibling.nextSibling);
+  if (needsTrailing) {
+    const extra = document.createElement('br');
+    br.parentNode.insertBefore(extra, br.nextSibling);
+  }
+
+  const newRange = document.createRange();
+  newRange.setStartAfter(br);
+  newRange.collapse(true);
+  sel.removeAllRanges();
+  sel.addRange(newRange);
 }
 
 // ===== KEY REPEAT SUPPRESSION =====
@@ -520,34 +593,17 @@ editor.addEventListener('keydown', (e) => {
     return;
   }
 
-  // Handle Enter — always insert a <br> at the current cursor position
+  // Tab must never move focus out of the editor (it would strand the toddler
+  // on a toolbar button where typing does nothing). Swallow it.
+  if (e.key === 'Tab') {
+    e.preventDefault();
+    return;
+  }
+
+  // Handle Enter — insert a line break at the cursor.
   if (e.key === 'Enter') {
     e.preventDefault();
-    const sel = window.getSelection();
-    if (!sel.rangeCount) return;
-    const range = sel.getRangeAt(0);
-    range.deleteContents();
-
-    const br = document.createElement('br');
-    range.insertNode(br);
-
-    // We need a trailing <br> after our <br> if we're at the end,
-    // otherwise the browser won't visually show the new line.
-    // But always move cursor AFTER our inserted <br>.
-    const needsTrailing = !br.nextSibling ||
-      (br.nextSibling.nodeType === 1 && br.nextSibling.tagName === 'BR' && !br.nextSibling.nextSibling);
-    if (needsTrailing) {
-      const extra = document.createElement('br');
-      br.parentNode.insertBefore(extra, br.nextSibling);
-    }
-
-    // Move cursor after the br
-    const newRange = document.createRange();
-    newRange.setStartAfter(br);
-    newRange.collapse(true);
-    sel.removeAllRanges();
-    sel.addRange(newRange);
-
+    insertLineBreak();
     playKeySound('Enter');
     scheduleSave();
     return;
@@ -773,6 +829,11 @@ window.addEventListener('resize', () => {
   resizeEmojiTimer = setTimeout(buildEmojiPanel, 300);
 });
 
+function closeEmojiPanel() {
+  emojiPanel.classList.remove('open');
+  document.getElementById('emoji-toggle').classList.remove('active');
+}
+
 document.getElementById('emoji-toggle').addEventListener('click', () => {
   emojiPanel.classList.toggle('open');
   document.getElementById('emoji-toggle').classList.toggle('active');
@@ -894,20 +955,100 @@ document.getElementById('next-page').addEventListener('click', () => {
 
 updatePageIndicator();
 
-// ===== FULLSCREEN + POINTER LOCK =====
-async function enterLockedFullscreen() {
-  const el = document.documentElement;
-  try {
-    // Pointer lock must be requested BEFORE fullscreen (fullscreen consumes transient activation)
-    await el.requestPointerLock();
-    pointerLocked = true;
-  } catch (e) {
-    // Pointer lock may fail — that's okay, still go fullscreen
+// ===== FULLSCREEN + POINTER LOCK + VIRTUAL CURSOR =====
+// In fullscreen we lock the real OS pointer (so it can't reach the menu bar,
+// dock, hot corners, or trigger swipe-to-switch) and draw our OWN cursor that
+// moves with the trackpad's OS-accelerated deltas — so it feels native, but
+// is fully contained inside the app.
+
+const cursorEl = document.getElementById('virtual-cursor');
+const CURSOR_SENSITIVITY = 1.0;      // 1:1 with macOS pointer speed → native feel
+const vc = { x: window.innerWidth / 2, y: window.innerHeight / 2 };
+let hoverEl = null;
+let pressBtn = null;
+let lastLockAttempt = 0;
+let cursorPlaced = false;   // false until the cursor has been positioned once
+
+function clamp(v, lo, hi) { return v < lo ? lo : (v > hi ? hi : v); }
+
+function renderCursor() {
+  // Arrow tip sits a few px in from the SVG's top-left corner.
+  cursorEl.style.transform = 'translate3d(' + (vc.x - 3) + 'px,' + (vc.y - 2) + 'px,0)';
+}
+
+function clearHover() {
+  if (hoverEl) { hoverEl.classList.remove('vc-hover'); hoverEl = null; }
+}
+
+// --- Hit testing (the virtual cursor is pointer-events:none, so it's ignored) ---
+function buttonAt(x, y) {
+  const el = document.elementFromPoint(x, y);
+  return el ? el.closest('button') : null;
+}
+function isEditorAt(x, y) {
+  const el = document.elementFromPoint(x, y);
+  return !!el && (el === editor || editor.contains(el));
+}
+
+function placeCaretAtPoint(x, y) {
+  let range = null;
+  if (document.caretRangeFromPoint) {
+    range = document.caretRangeFromPoint(x, y);
+  } else if (document.caretPositionFromPoint) {
+    const p = document.caretPositionFromPoint(x, y);
+    if (p) { range = document.createRange(); range.setStart(p.offsetNode, p.offset); range.collapse(true); }
   }
+  editor.focus();
+  if (range) {
+    const sel = window.getSelection();
+    sel.removeAllRanges();
+    sel.addRange(range);
+  }
+}
+
+// --- Pointer lock acquisition ---
+function requestLock() {
+  const el = document.documentElement;
+  if (!el.requestPointerLock) return;
   try {
-    await el.requestFullscreen();
-    hasEnteredFullscreen = true;
+    const p = el.requestPointerLock();   // default = OS-accelerated (native) movement
+    if (p && p.catch) p.catch(() => {});
   } catch (e) {}
+}
+
+// Auto-heal: if we're in fullscreen but lost the lock (e.g. a stray Esc), grab
+// it again on the next interaction — respecting Chrome's ~1.25s re-lock cooldown.
+function maybeRelock() {
+  if (!hasEnteredFullscreen) return;
+  if (!document.fullscreenElement) return;     // the big prompt covers this case
+  if (document.pointerLockElement) return;
+  const now = Date.now();
+  if (now - lastLockAttempt < 1300) return;
+  lastLockAttempt = now;
+  requestLock();
+}
+
+function enterLockedFullscreen() {
+  hasEnteredFullscreen = true;
+  const el = document.documentElement;
+  if (!document.fullscreenElement) {
+    try {
+      const fp = el.requestFullscreen ? el.requestFullscreen() : null;
+      if (fp && fp.catch) fp.catch(() => {});
+    } catch (e) {}
+  }
+  // Request the lock in the SAME user gesture (canonical Chrome pattern — most
+  // reliable). The fullscreenchange handler and maybeRelock() are backups in
+  // case this attempt is rejected.
+  requestLock();
+}
+
+function updatePrompt() {
+  if (hasEnteredFullscreen && !document.fullscreenElement) {
+    fullscreenPrompt.classList.add('show');
+  } else {
+    fullscreenPrompt.classList.remove('show');
+  }
 }
 
 document.getElementById('fullscreen-btn').addEventListener('click', () => {
@@ -920,24 +1061,117 @@ document.getElementById('fullscreen-btn').addEventListener('click', () => {
 
 document.getElementById('reenter-fullscreen').addEventListener('click', () => {
   enterLockedFullscreen();
-  fullscreenPrompt.classList.remove('show');
 });
 
 document.addEventListener('fullscreenchange', () => {
-  if (!document.fullscreenElement && hasEnteredFullscreen) {
-    // Exited fullscreen — also exit pointer lock if active
-    if (document.pointerLockElement) {
-      document.exitPointerLock();
-    }
-    pointerLocked = false;
-    fullscreenPrompt.classList.add('show');
-  } else {
-    fullscreenPrompt.classList.remove('show');
+  if (document.fullscreenElement) {
+    requestLock();                              // grab the pointer as soon as we're fullscreen
+  } else if (document.pointerLockElement) {
+    document.exitPointerLock();
   }
+  updatePrompt();
 });
 
 document.addEventListener('pointerlockchange', () => {
   pointerLocked = !!document.pointerLockElement;
+  document.body.classList.toggle('locked', pointerLocked);
+  cursorEl.style.display = pointerLocked ? 'block' : 'none';
+  if (pointerLocked) {
+    // Center on the first lock for a predictable start; on later re-locks (e.g.
+    // after a stray Esc) keep the last position unless it has drifted off-screen.
+    const offscreen = vc.x < 0 || vc.y < 0 || vc.x > window.innerWidth || vc.y > window.innerHeight;
+    if (!cursorPlaced || offscreen) {
+      vc.x = window.innerWidth / 2;
+      vc.y = window.innerHeight / 2;
+      cursorPlaced = true;
+    }
+    renderCursor();
+    editor.focus();
+  } else {
+    clearHover();
+  }
+});
+document.addEventListener('pointerlockerror', () => { /* swallow; auto-heal will retry */ });
+
+// --- Virtual cursor movement (only while locked) ---
+let hoverScheduled = false;
+function refreshHover() {
+  hoverScheduled = false;
+  const btn = buttonAt(vc.x, vc.y);
+  if (btn !== hoverEl) {
+    if (hoverEl) hoverEl.classList.remove('vc-hover');
+    hoverEl = btn;
+    if (hoverEl) hoverEl.classList.add('vc-hover');
+  }
+}
+document.addEventListener('mousemove', (e) => {
+  if (!pointerLocked) return;
+  vc.x = clamp(vc.x + e.movementX * CURSOR_SENSITIVITY, 0, window.innerWidth - 1);
+  vc.y = clamp(vc.y + e.movementY * CURSOR_SENSITIVITY, 0, window.innerHeight - 1);
+  renderCursor();                       // cheap (compositor transform), do every event
+  if (!hoverScheduled) {                // hit-test at most once per frame
+    hoverScheduled = true;
+    requestAnimationFrame(refreshHover);
+  }
+});
+
+// --- Virtual cursor press / release (trusted events only; .click() is synthetic) ---
+document.addEventListener('mousedown', (e) => {
+  maybeRelock();
+  if (!pointerLocked) return;
+  e.preventDefault();
+  e.stopPropagation();
+  cursorEl.classList.add('pressing');
+  const btn = buttonAt(vc.x, vc.y);
+  if (btn) {
+    pressBtn = btn;
+    btn.classList.add('vc-press');
+  } else {
+    pressBtn = null;
+    if (isEditorAt(vc.x, vc.y)) {
+      placeCaretAtPoint(vc.x, vc.y);
+      closeEmojiPanel();
+    }
+  }
+}, true);
+
+document.addEventListener('mouseup', (e) => {
+  if (!pointerLocked) return;
+  e.preventDefault();
+  e.stopPropagation();
+  cursorEl.classList.remove('pressing');
+  if (pressBtn) {
+    pressBtn.classList.remove('vc-press');
+    if (buttonAt(vc.x, vc.y) === pressBtn) pressBtn.click();  // synthetic → passes the swallow filter
+    pressBtn = null;
+  }
+}, true);
+
+// Swallow the real (trusted) click + dblclick that pointer lock fires at the
+// lock origin, so they can't activate whatever sits under the screen center or
+// select a random word. Our synthetic .click() (isTrusted=false) passes through.
+['click', 'dblclick'].forEach((ev) => {
+  document.addEventListener(ev, (e) => {
+    if (pointerLocked && e.isTrusted) { e.preventDefault(); e.stopPropagation(); }
+  }, true);
+});
+
+// --- Scrolling & zoom guards ---
+document.addEventListener('wheel', (e) => {
+  if (e.ctrlKey) { e.preventDefault(); return; }   // block pinch / ctrl+wheel zoom
+  if (pointerLocked) {
+    editor.scrollTop += e.deltaY;                   // two-finger scroll → scroll the page
+    e.preventDefault();
+  }
+}, { passive: false });
+
+// Re-lock on keypress too (cheap auto-heal after a stray Esc).
+document.addEventListener('keydown', maybeRelock, true);
+
+window.addEventListener('resize', () => {
+  vc.x = clamp(vc.x, 0, window.innerWidth - 1);
+  vc.y = clamp(vc.y, 0, window.innerHeight - 1);
+  if (pointerLocked) renderCursor();
 });
 
 // ===== PREVENT ACCIDENTAL EXIT =====
@@ -952,6 +1186,17 @@ document.addEventListener('contextmenu', (e) => {
   e.preventDefault();
 });
 
+// ===== TRAP HISTORY NAVIGATION (two-finger swipe back/forward) =====
+history.pushState(null, '', location.href);
+window.addEventListener('popstate', () => {
+  history.pushState(null, '', location.href);
+});
+
+// ===== PREVENT DRAG & DROP (dragging text out / dropping files in) =====
+['dragstart', 'dragover', 'drop'].forEach((ev) => {
+  document.addEventListener(ev, (e) => e.preventDefault());
+});
+
 // ===== FOCUS EDITOR ON LOAD =====
 editor.focus();
 
@@ -963,10 +1208,17 @@ document.getElementById('print-btn').addEventListener('click', () => {
 // ===== CLICK OUTSIDE EMOJI PANEL TO CLOSE =====
 editor.addEventListener('click', () => {
   if (emojiPanel.classList.contains('open')) {
-    emojiPanel.classList.remove('open');
-    document.getElementById('emoji-toggle').classList.remove('active');
+    closeEmojiPanel();
   }
 });
+
+// ===== KEEP TYPING FOCUS ON THE EDITOR =====
+// All toolbar controls are click-driven, so after any toolbar interaction we
+// return keyboard focus to the editor. This guarantees a child banging the keys
+// always types into the page instead of getting "stuck" on a focused button
+// (where Space/Enter would re-trigger the button and letters would do nothing).
+// Runs after the button's own handler (bubble order), so its action still fires.
+toolbar.addEventListener('click', () => { editor.focus(); });
 </script>
 </body>
 </html>
