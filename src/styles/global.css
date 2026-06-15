@@ -209,9 +209,12 @@ body {
 }
 
 @media (pointer: coarse) {
+  /* Sit just above the docked compose bar + keyboard (--dock-h set by App). */
   #emoji-panel {
-    bottom: 0;
-    padding-bottom: 80px;
+    bottom: var(--dock-h, 0);
+    padding-bottom: 8px;
+    max-height: calc(100vh - var(--dock-h, 0));
+    overflow-y: auto;
   }
 }
 @media (pointer: fine) {
@@ -290,8 +293,10 @@ body {
 
 @media (pointer: coarse) {
   #theme-panel {
-    bottom: 0;
-    padding-bottom: 80px;
+    bottom: var(--dock-h, 0);
+    padding-bottom: 8px;
+    max-height: calc(100vh - var(--dock-h, 0));
+    overflow-y: auto;
   }
 }
 @media (pointer: fine) {
@@ -421,6 +426,14 @@ body {
 }
 
 /* Padding top/bottom is set dynamically by JS based on toolbar height. */
+
+/* Touch: the editor is non-editable (input comes from the on-screen keyboard),
+   so suppress the long-press selection/lookup callout. */
+@media (pointer: coarse) {
+  #editor {
+    -webkit-touch-callout: none;
+  }
+}
 
 /* ===== LETTER ANIMATION ===== */
 @keyframes pop-in {
@@ -604,13 +617,162 @@ button.vc-press {
   transform: scale(0.9) !important;
 }
 
+/* ===== MOBILE: DOCK (compose bar + on-screen keyboard) ===== */
+/* The bottom-docked input area on touch devices. Its height is published as
+   --dock-h (by App) so the editor padding and the panels sit clear of it. */
+#mobile-dock {
+  position: fixed;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 100;
+  background: #f8f9fa;
+  border-top: 3px solid #e9ecef;
+  display: flex;
+  flex-direction: column;
+  padding-bottom: env(safe-area-inset-bottom);
+}
+
+/* ----- Slim always-visible compose bar (colors + emoji + parent gear) ----- */
+#compose-bar {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 8px;
+  border-bottom: 2px solid #e9ecef;
+}
+.compose-colors {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  flex: 1;
+  min-width: 0;
+  overflow-x: auto;
+  padding: 2px;
+  -webkit-overflow-scrolling: touch;
+  scrollbar-width: none;
+}
+.compose-colors::-webkit-scrollbar {
+  display: none;
+}
+.parent-gear {
+  flex-shrink: 0;
+}
+
+/* ----- The big ABC keyboard ----- */
+#onscreen-keyboard {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 8px 6px;
+  -webkit-user-select: none;
+  user-select: none;
+  -webkit-touch-callout: none;
+}
+.kbd-letters {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  gap: 5px;
+}
+.kbd-actions {
+  display: flex;
+  gap: 5px;
+}
+.kbd-key {
+  height: 48px;
+  border: 2px solid #dee2e6;
+  border-radius: 12px;
+  background: white;
+  color: #2c3e50;
+  font-family: 'Bubblegum Sans', cursive;
+  font-size: 26px;
+  line-height: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  touch-action: manipulation;
+  -webkit-tap-highlight-color: transparent;
+  -webkit-touch-callout: none;
+  transition: transform 0.08s, background 0.08s;
+}
+.kbd-key:active {
+  transform: scale(0.92);
+  background: #ebf3ff;
+}
+.kbd-space {
+  flex: 1;
+}
+.kbd-space-bar {
+  display: block;
+  width: 60%;
+  height: 4px;
+  border-radius: 2px;
+  background: #c8ccd2;
+}
+.kbd-backspace,
+.kbd-enter {
+  flex: 0 0 64px;
+  font-size: 24px;
+}
+.kbd-backspace {
+  color: #ff6b6b;
+}
+.kbd-enter {
+  color: #4d96ff;
+}
+
+/* ----- Parent controls drawer (the toolbar, as a slide-up sheet on touch) ----- */
+#toolbar.toolbar-drawer {
+  top: auto;
+  bottom: var(--dock-h, 0);
+  border-top: 3px solid #e9ecef;
+  border-bottom: none;
+  box-shadow: 0 -6px 20px rgba(0, 0, 0, 0.12);
+  padding: 12px;
+  gap: 8px;
+  max-height: calc(100vh - var(--dock-h, 0));
+  overflow-y: auto;
+  z-index: 99;
+  display: none;
+}
+#toolbar.toolbar-drawer.open {
+  display: flex;
+}
+
+#ios-setup-tip {
+  flex-basis: 100%;
+  margin-top: 6px;
+  padding: 12px;
+  background: #fff8e6;
+  border: 2px solid #ffe39a;
+  border-radius: 12px;
+  font-family: 'Fredoka', sans-serif;
+  color: #6b5a1f;
+  font-size: 14px;
+}
+#ios-setup-tip .tip-title {
+  font-weight: 600;
+  font-size: 15px;
+  margin-bottom: 6px;
+}
+#ios-setup-tip .tip-steps {
+  margin: 0;
+  padding-left: 18px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  line-height: 1.35;
+}
+
 /* ===== PRINT ===== */
 @media print {
   #toolbar,
   #emoji-panel,
   #theme-panel,
   #fullscreen-prompt,
-  #virtual-cursor {
+  #virtual-cursor,
+  #mobile-dock {
     display: none !important;
   }
   #editor {

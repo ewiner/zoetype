@@ -1,5 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import {
+  deleteBackward,
   handleBeforeInput,
   handleKeydown,
   handlePaste,
@@ -82,6 +83,69 @@ describe('insertLineBreak', () => {
     insertLineBreak(editor) // -> span, br, padbr
     insertLineBreak(editor) // -> span, br, br, padbr  (3 total, not 4)
     expect(editor.querySelectorAll('br').length).toBe(3)
+  })
+})
+
+describe('deleteBackward', () => {
+  it('removes the character span before a caret at the top level', () => {
+    const editor = makeEditor('<span>H</span><span>i</span>')
+    caretAt(editor, 2) // after both spans
+    deleteBackward(editor)
+    expect(editor.querySelectorAll('span').length).toBe(1)
+    expect(editor.textContent).toBe('H')
+  })
+
+  it('removes the enclosing span when the caret is inside its text node', () => {
+    const editor = makeEditor('<span>H</span><span>i</span>')
+    const iText = editor.lastChild!.firstChild! // text node inside <span>i</span>
+    caretAt(iText, 1) // offset 1 = after the letter
+    deleteBackward(editor)
+    expect(editor.innerHTML).toBe('<span>H</span>')
+  })
+
+  it('removes a line break (joins lines) when the caret is at the start of the next line', () => {
+    const editor = makeEditor('<span>H</span><br><span>i</span>')
+    const iText = editor.lastChild!.firstChild!
+    caretAt(iText, 0) // before "i", i.e. at the start of the second line
+    deleteBackward(editor)
+    expect(editor.querySelectorAll('br').length).toBe(0)
+    expect(editor.innerHTML).toBe('<span>H</span><span>i</span>')
+  })
+
+  it('removes the visible blank line (break) left by Enter at the end', () => {
+    const editor = makeEditor('<span>H</span>')
+    caretAt(editor, 1)
+    insertLineBreak(editor) // -> <span>H</span><br><br>
+    deleteBackward(editor)
+    // one backspace clears the just-added empty line
+    expect(editor.querySelectorAll('br').length).toBe(1)
+    expect(editor.textContent).toBe('H')
+  })
+
+  it('clears a lone leftover <br> so the empty-state placeholder can show', () => {
+    const editor = makeEditor('<span>H</span><br>')
+    caretAt(editor, 1) // between the span and the br
+    deleteBackward(editor) // removes the span, leaving a lone <br>...
+    expect(editor.childNodes.length).toBe(0) // ...which is then cleaned up
+  })
+
+  it('is a no-op on an empty editor', () => {
+    const editor = makeEditor('')
+    caretAt(editor, 0)
+    expect(() => deleteBackward(editor)).not.toThrow()
+    expect(editor.textContent).toBe('')
+  })
+
+  it('deletes a non-collapsed selection wholesale', () => {
+    const editor = makeEditor('<span>H</span><span>i</span>')
+    const sel = window.getSelection()!
+    const range = document.createRange()
+    range.setStart(editor, 0)
+    range.setEnd(editor, 2)
+    sel.removeAllRanges()
+    sel.addRange(range)
+    deleteBackward(editor)
+    expect(editor.textContent).toBe('')
   })
 })
 

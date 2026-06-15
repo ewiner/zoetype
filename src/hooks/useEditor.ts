@@ -1,10 +1,13 @@
 import { useCallback, useEffect, useRef } from 'react'
 import {
+  deleteBackward as deleteBackwardDom,
   handleBeforeInput,
   handleKeydown,
   handlePaste,
   insertEmoji as insertEmojiDom,
+  insertLineBreak as insertLineBreakDom,
   placeCaretAtPoint as placeCaretAtPointDom,
+  scrollCaretIntoView,
   wrapNakedSpaceNode,
   type EditorDeps,
 } from '../lib/editorDom'
@@ -17,6 +20,12 @@ export interface EditorApi {
   getContent: () => string
   focus: () => void
   insertEmoji: (emoji: string) => void
+  /** Type one styled character at the caret (on-screen keyboard letters / space). */
+  typeChar: (char: string) => void
+  /** Insert a line break at the caret (on-screen keyboard Enter). */
+  lineBreak: () => void
+  /** Delete the character before the caret (on-screen keyboard Backspace). */
+  deleteBackward: () => void
   placeCaretAtPoint: (x: number, y: number) => void
 }
 
@@ -27,6 +36,11 @@ export interface UseEditorOptions {
   playSound: (key: string) => void
   /** Called when the editor surface is clicked (used to close open panels). */
   onEditorClick: () => void
+  /**
+   * Touch device: the editor is non-editable (no native keyboard), so a tap
+   * should place the caret programmatically for the on-screen keyboard.
+   */
+  coarse?: boolean
 }
 
 /**
@@ -60,6 +74,36 @@ export function useEditor(opts: UseEditorOptions): EditorApi {
     optsRef.current.onContentChange()
   }, [])
 
+  const typeChar = useCallback((char: string) => {
+    const el = editorRef.current
+    if (!el) return
+    // Reuses the same DOM routine as emoji insertion (styled, animated span at
+    // the caret) but plays the per-letter pitch keyed on the character itself.
+    insertEmojiDom(el, char, optsRef.current.resolveStyle())
+    optsRef.current.playSound(char)
+    scrollCaretIntoView(el)
+    optsRef.current.onContentChange()
+  }, [])
+
+  const lineBreak = useCallback(() => {
+    const el = editorRef.current
+    if (!el) return
+    el.focus()
+    insertLineBreakDom(el)
+    optsRef.current.playSound('Enter')
+    scrollCaretIntoView(el)
+    optsRef.current.onContentChange()
+  }, [])
+
+  const deleteBackward = useCallback(() => {
+    const el = editorRef.current
+    if (!el) return
+    deleteBackwardDom(el)
+    optsRef.current.playSound('_delete')
+    scrollCaretIntoView(el)
+    optsRef.current.onContentChange()
+  }, [])
+
   const placeCaretAtPoint = useCallback((x: number, y: number) => {
     if (editorRef.current) placeCaretAtPointDom(editorRef.current, x, y)
   }, [])
@@ -79,7 +123,12 @@ export function useEditor(opts: UseEditorOptions): EditorApi {
     const onKeydown = (e: KeyboardEvent) => handleKeydown(e, deps())
     const onPaste = (e: ClipboardEvent) => handlePaste(e, deps())
     const onInput = () => optsRef.current.onContentChange()
-    const onClick = () => optsRef.current.onEditorClick()
+    const onClick = (e: MouseEvent) => {
+      // On touch the editor is non-editable, so place the caret ourselves where
+      // the user tapped (a non-editable div won't summon the native keyboard).
+      if (optsRef.current.coarse) placeCaretAtPointDom(editor, e.clientX, e.clientY)
+      optsRef.current.onEditorClick()
+    }
 
     editor.addEventListener('beforeinput', onBeforeInput)
     editor.addEventListener('keydown', onKeydown)
@@ -116,5 +165,15 @@ export function useEditor(opts: UseEditorOptions): EditorApi {
     }
   }, [])
 
-  return { editorRef, setContent, getContent, focus, insertEmoji, placeCaretAtPoint }
+  return {
+    editorRef,
+    setContent,
+    getContent,
+    focus,
+    insertEmoji,
+    typeChar,
+    lineBreak,
+    deleteBackward,
+    placeCaretAtPoint,
+  }
 }

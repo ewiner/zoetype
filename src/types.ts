@@ -37,4 +37,4 @@ export interface ThemeDef {
   name: string
 }
 
-export type PanelName = 'emoji' | 'theme' | null
+export type PanelName = 'emoji' | 'theme' | 'controls' | null
